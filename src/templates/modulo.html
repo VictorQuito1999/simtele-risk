@@ -3,8 +3,16 @@
 {% block title %}Módulo {{ caso.id }}: {{ caso.nombre }} · SIMTELE-RISK{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 1.5rem;">
+<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 1.25rem;">
   <a href="/" style="text-decoration: none; color: var(--accent); font-weight: 600; font-size: 0.9rem;">← Volver al Panel Principal</a>
+  
+  <!-- Selector de Pestañas entre los 4 Módulos Obligatorios -->
+  <div style="display: flex; gap: 6px; background: var(--surface); padding: 4px; border: 1px solid var(--border); border-radius: 8px; flex-wrap: wrap;">
+    <a href="/modulo/1" class="btn btn-sm {% if caso.id == 1 %}btn-primary{% else %}btn-outline{% endif %}" style="font-size: 0.82rem; padding: 4px 10px; text-decoration: none;">🚠 Módulo 1: Detención</a>
+    <a href="/modulo/2" class="btn btn-sm {% if caso.id == 2 %}btn-primary{% else %}btn-outline{% endif %}" style="font-size: 0.82rem; padding: 4px 10px; text-decoration: none;">⚙️ Módulo 2: Deterioro</a>
+    <a href="/modulo/3" class="btn btn-sm {% if caso.id == 3 %}btn-primary{% else %}btn-outline{% endif %}" style="font-size: 0.82rem; padding: 4px 10px; text-decoration: none;">💨 Módulo 3: Viento</a>
+    <a href="/modulo/4" class="btn btn-sm {% if caso.id == 4 %}btn-primary{% else %}btn-outline{% endif %}" style="font-size: 0.82rem; padding: 4px 10px; text-decoration: none;">📡 Módulo 4: Sensores</a>
+  </div>
 </div>
 
 <div class="card">

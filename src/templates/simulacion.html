@@ -15,6 +15,12 @@
       </span>
       <span style="font-size: 0.85rem; color: var(--text-muted);">Fecha: {{ sim.fecha }}</span>
     </div>
+    <div style="margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap;">
+      <a href="/modulo/1" class="btn btn-sm {% if sim.caso_id == 1 %}btn-primary{% else %}btn-outline{% endif %}" style="font-size: 0.8rem; padding: 3px 8px; text-decoration: none;">🚠 M1: Detención</a>
+      <a href="/modulo/2" class="btn btn-sm {% if sim.caso_id == 2 %}btn-primary{% else %}btn-outline{% endif %}" style="font-size: 0.8rem; padding: 3px 8px; text-decoration: none;">⚙️ M2: Deterioro</a>
+      <a href="/modulo/3" class="btn btn-sm {% if sim.caso_id == 3 %}btn-primary{% else %}btn-outline{% endif %}" style="font-size: 0.8rem; padding: 3px 8px; text-decoration: none;">💨 M3: Viento</a>
+      <a href="/modulo/4" class="btn btn-sm {% if sim.caso_id == 4 %}btn-primary{% else %}btn-outline{% endif %}" style="font-size: 0.8rem; padding: 3px 8px; text-decoration: none;">📡 M4: Sensores</a>
+    </div>
   </div>
   <div style="display: flex; gap: 10px;">
     <a href="/relanzar/{{ sim.id }}" class="btn">🔁 Relanzar Simulación (Prueba Persistencia)</a>

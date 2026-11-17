@@ -82,22 +82,23 @@
   <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <span class="badge" style="background:#f1f5f9; color:#475569;">Caso 3 · En Desarrollo</span>
+        <span class="badge badge-normal">Caso 3 · Activo S2</span>
         <span style="font-size: 0.8rem; color: var(--text-muted);">EDO 2° Orden + Integración</span>
       </div>
       <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.5rem;">
         3. Oscilaciones de Cabina por Viento
       </h3>
       <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
-        Dinámica pendular de la cabina bajo ráfagas de viento lateral en altura. Simula régimen subamortiguado con $m \ddot{x} + c \dot{x} + k x = F(t)$ y evalúa la energía de balanceo acumulada $\int x^2 dt$.
+        Dinámica pendular de la cabina bajo ráfagas de viento lateral en altura. Simula régimen subamortiguado con $m \ddot{x} + c \dot{x} + k x = F(t)$, contrasta contra solución analítica libre y evalúa la energía de balanceo acumulada $\int x^2 dt$ (Trapecio, Simpson 1/3, Romberg).
       </p>
       <div style="background: var(--bg); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem;">
-        <b>Parámetros:</b> $m=3000\text{ kg}, c=600\text{ Ns/m}, k=12000\text{ N/m}, F=800\text{ N}$
+        <b>Parámetros:</b> $m=3000\text{ kg}, c=600\text{ Ns/m}, k=12000\text{ N/m}, F=800\text{ N}$<br>
+        <b>Modelos:</b> Heun RK2, Runge-Kutta RK4, Romberg, Solución Analítica Subamortiguada
       </div>
     </div>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
-      <span style="font-size: 0.8rem; color: var(--text-muted);">Semana 2/3</span>
-      <a href="/modulo/3" class="btn btn-sm btn-outline">Ver Formulación →</a>
+      <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">RK2, RK4, Romberg, Energía</span>
+      <a href="/modulo/3" class="btn btn-sm">Explorar Módulo 3 →</a>
     </div>
   </div>
 
@@ -105,22 +106,23 @@
   <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <span class="badge" style="background:#f1f5f9; color:#475569;">Caso 4 · En Desarrollo</span>
+        <span class="badge badge-normal">Caso 4 · Activo S2</span>
         <span style="font-size: 0.8rem; color: var(--text-muted);">Interpolación Polinómica & Splines</span>
       </div>
       <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.5rem;">
         4. Reconstrucción de Señales de Sensores
       </h3>
       <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
-        Reconstrucción de lecturas faltantes en sensores de tensión de cable y velocidad de línea. Compara Lagrange, Newton por diferencias divididas y Splines cúbicos frente al fenómeno de Runge y datos ruidosos.
+        Reconstrucción de lecturas faltantes en sensores de tensión de cable y velocidad de línea. Compara Lagrange, Newton por diferencias divididas y Splines cúbicos naturales frente al fenómeno de Runge y datos ruidosos.
       </p>
       <div style="background: var(--bg); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem;">
-        <b>Modelos:</b> Nodos equiespaciados vs Chebyshev, señal $y(t) = \sin(t) + \varepsilon$
+        <b>Modelos:</b> Lagrange, Newton dif. divididas, Splines cúbicos $C^2$<br>
+        <b>Experimentos:</b> Gaps 40%, ruido gaussiano y Fenómeno de Runge en $f(t) = \frac{1}{1+25t^2}$
       </div>
     </div>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
-      <span style="font-size: 0.8rem; color: var(--text-muted);">Semana 2/3</span>
-      <a href="/modulo/4" class="btn btn-sm btn-outline">Ver Formulación →</a>
+      <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">Lagrange, Newton, Splines $C^2$</span>
+      <a href="/modulo/4" class="btn btn-sm">Explorar Módulo 4 →</a>
     </div>
   </div>
 </div>

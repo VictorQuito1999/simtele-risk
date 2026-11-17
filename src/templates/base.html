@@ -63,18 +63,20 @@
     .brand span { color: var(--accent); }
     .nav-links {
       display: flex;
-      gap: 1.25rem;
+      gap: 0.4rem;
       align-items: center;
       list-style: none;
+      flex-wrap: wrap;
     }
     .nav-links a {
       text-decoration: none;
       color: var(--text);
       font-weight: 500;
-      font-size: 0.95rem;
-      padding: 0.4rem 0.8rem;
+      font-size: 0.85rem;
+      padding: 0.35rem 0.6rem;
       border-radius: 6px;
       transition: all 0.2s;
+      white-space: nowrap;
     }
     .nav-links a:hover, .nav-links a.active {
       color: var(--primary);
@@ -270,9 +272,11 @@
       </a>
       <ul class="nav-links">
         <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">Inicio</a></li>
-        <li><a href="/modulo/1" class="{% if request.path.startswith('/modulo/1') %}active{% endif %}">Módulo 1: Detención</a></li>
-        <li><a href="/modulo/2" class="{% if request.path.startswith('/modulo/2') %}active{% endif %}">Módulo 2: Deterioro</a></li>
-        <li><a href="/teoria-errores" class="{% if request.path == '/teoria-errores' %}active{% endif %}">Teoría de Errores</a></li>
+        <li><a href="/modulo/1" class="{% if request.path.startswith('/modulo/1') %}active{% endif %}">M1: Detención</a></li>
+        <li><a href="/modulo/2" class="{% if request.path.startswith('/modulo/2') %}active{% endif %}">M2: Deterioro</a></li>
+        <li><a href="/modulo/3" class="{% if request.path.startswith('/modulo/3') %}active{% endif %}">M3: Viento</a></li>
+        <li><a href="/modulo/4" class="{% if request.path.startswith('/modulo/4') %}active{% endif %}">M4: Sensores</a></li>
+        <li><a href="/teoria-errores" class="{% if request.path == '/teoria-errores' %}active{% endif %}">Teoría</a></li>
         <li><a href="/historial" class="{% if request.path == '/historial' %}active{% endif %}">Historial BD</a></li>
       </ul>
     </div>
