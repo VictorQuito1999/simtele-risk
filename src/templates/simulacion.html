@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}Simulación #{{ sim.id }} · {{ sim.nombre }} · SIMTELE-RISK{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+  <div>
+    <a href="/modulo/{{ sim.caso_id }}" style="text-decoration: none; color: var(--accent); font-weight: 600; font-size: 0.9rem;">← Volver al Módulo {{ sim.caso_id }}</a>
+    <h1 style="font-size: 1.8rem; font-weight: 800; color: var(--primary); margin-top: 0.25rem;">
+      Simulación #{{ sim.id }} · {{ sim.nombre }}
+    </h1>
+    <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+      <span class="badge {% if sim.tipo == 'NORMAL' %}badge-normal{% elif sim.tipo == 'ESTRES' %}badge-estres{% else %}badge-mal{% endif %}">
+        Escenario {{ sim.tipo }}
+      </span>
+      <span style="font-size: 0.85rem; color: var(--text-muted);">Fecha: {{ sim.fecha }}</span>
+    </div>
+  </div>
+  <div style="display: flex; gap: 10px;">
+    <a href="/relanzar/{{ sim.id }}" class="btn">🔁 Relanzar Simulación (Prueba Persistencia)</a>
+    <a href="/historial" class="btn btn-outline">Ver Historial</a>
+  </div>
+</div>
+
+<!-- Banner de Estado de Seguridad Operacional -->
+{% if sim.caso_id == 2 %}
+  {% if p.get('t_exacto', 15.0) < 5.0 %}
+    <div class="alert alert-danger" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">🚨</span>
+      <div>
+        <b>ESTADO CRÍTICO DE DESGASTE:</b> El tiempo estimado al umbral de inspección es de apenas <b>{{ '%.2f' % p.get('t_exacto', 0) }} meses</b>. Se requiere inspección electromagnética (END) urgente y reprogramación de la rotación del cable.
+      </div>
+    </div>
+  {% elif p.get('t_exacto', 15.0) < 10.0 %}
+    <div class="alert alert-warning" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">⚠️</span>
+      <div>
+        <b>ALERTA DE MANTENIMIENTO:</b> Vida útil remanente estimada en <b>{{ '%.2f' % p.get('t_exacto', 0) }} meses</b>. Programar intervención técnica preventiva en la próxima ventana de mantenimiento nocturno.
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-success" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">✅</span>
+      <div>
+        <b>OPERACIÓN NOMINAL SEGURA:</b> Vida útil remanente holgada (<b>{{ '%.2f' % p.get('t_exacto', 0) }} meses</b>). Los parámetros de degradación se encuentran dentro de las tolerancias admisibles según norma EN 12927.
+      </div>
+    </div>
+  {% endif %}
+{% elif sim.caso_id == 1 %}
+  {% set d_tot = p.get('d_total', 17.5) %}
+  {% set L_disp = p.get('L', 20.0) %}
+  {% if d_tot <= L_disp %}
+    <div class="alert alert-success" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">✅</span>
+      <div>
+        <b>CUMPLE RESTRICCIÓN DE SEGURIDAD (EN 12929-1):</b> Distancia total calculada = <b>{{ '%.2f' % d_tot }} m</b> $\le$ Distancia disponible = <b>{{ '%.2f' % L_disp }} m</b>. Margen de vía libre = <b>{{ '%.2f' % (L_disp - d_tot) }} m</b>.
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-danger" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">🚨</span>
+      <div>
+        <b>RIESGO DE COLISIÓN EN ESTACIÓN:</b> Distancia total requerida = <b>{{ '%.2f' % d_tot }} m</b> supera la vía libre disponible de <b>{{ '%.2f' % L_disp }} m</b> por <b>{{ '%.2f' % (d_tot - L_disp) }} m</b>.
+      </div>
+    </div>
+  {% endif %}
+{% elif sim.caso_id == 3 %}
+  {% set xmax = p.get('x_max', 0.5) %}
+  {% if xmax > 0.80 %}
+    <div class="alert alert-danger" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">🚨</span>
+      <div>
+        <b>RIESGO CRÍTICO DE INTERFERENCIA / DESCARRILE:</b> Amplitud máxima de balanceo = <b>{{ '%.2f' % xmax }} m</b> supera el gálibo lateral admisible de <b>0.80 m</b> (Norma EN 12929-1). Requiere reducción inmediata de velocidad de cable o detención preventiva del sistema.
+      </div>
+    </div>
+  {% elif xmax > 0.50 %}
+    <div class="alert alert-warning" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">⚠️</span>
+      <div>
+        <b>ALERTA DE VIENTO FUERTE:</b> Amplitud de oscilación = <b>{{ '%.2f' % xmax }} m</b>. Movimiento pendular perceptible; activar monitoreo continuo de anemómetros y preparar protocolo de ralentización.
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-success" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">✅</span>
+      <div>
+        <b>OPERACIÓN NOMINAL SEGURA (EN 12929-1):</b> Amplitud máxima calculada = <b>{{ '%.2f' % xmax }} m</b> $\le$ Gálibo admisible (0.80 m). El amortiguamiento dinámico disipa adecuadamente la energía de las ráfagas.
+      </div>
+    </div>
+  {% endif %}
+{% elif sim.caso_id == 4 %}
+  {% set err_spl = p.get('err_rel_spl', 0.0) %}
+  {% if sim.tipo == 'MAL_CONDICIONADO' %}
+    <div class="alert alert-warning" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">⚠️</span>
+      <div>
+        <b>FENÓMENO DE RUNGE DETECTADO:</b> Con 14 nodos equiespaciados, Lagrange y Newton divergen violentamente en los bordes con errores de hasta un 1140%, mientras que los <b>Splines Cúbicos Naturales</b> mantienen estabilidad con error de solo <b>{{ '%.2e' % err_spl }}</b>.
+      </div>
+    </div>
+  {% elif err_spl > 0.05 %}
+    <div class="alert alert-danger" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">🚨</span>
+      <div>
+        <b>DISTORSIÓN EN TELEMETRÍA:</b> Pérdida de paquetes o ruido elevado generaron un desvío de <b>{{ '%.2f' % (err_spl*100) }}%</b> en la señal interpolada. Se recomienda recalibrar la tasa de muestreo.
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-success" style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.8rem;">✅</span>
+      <div>
+        <b>RECONSTRUCCIÓN EXACTA DE TELEMETRÍA:</b> Señal de sensores recuperada con fidelidad $C^2$ mediante Splines Cúbicos. Error relativo medio = <b>{{ '%.2e' % err_spl }}</b>.
+      </div>
+    </div>
+  {% endif %}
+{% endif %}
+
+<!-- DOS GRÁFICOS OBLIGATORIOS (Chart.js) -->
+<div class="grid-2" style="margin-bottom: 2rem;">
+  <!-- Gráfico 1: Fenómeno Físico -->
+  <div class="card" style="margin-bottom: 0;">
+    <div class="card-header">
+      <h3 class="card-title" style="font-size: 1.05rem;">
+        Gráfico 1: Fenómeno Físico (Curva del Modelo vs. Umbral)
+      </h3>
+      <span class="badge badge-blue">Solución / Escenario</span>
+    </div>
+    <div style="position: relative; height: 260px;">
+      <canvas id="chartFisico"></canvas>
+    </div>
+  </div>
+
+  <!-- Gráfico 2: Error y Convergencia Logarítmica -->
+  <div class="card" style="margin-bottom: 0;">
+    <div class="card-header">
+      <h3 class="card-title" style="font-size: 1.05rem;">
+        Gráfico 2: Convergencia Numérica (Error Relativo en Escala Log)
+      </h3>
+      <span class="badge badge-blue">Error vs. Iteración</span>
+    </div>
+    <div style="position: relative; height: 260px;">
+      <canvas id="chartError"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Tablas de Resultados Numéricos -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Resumen de Métodos Numéricos Ejecutados</h3>
+    <span style="font-size: 0.85rem; color: var(--text-muted);">Persistido en SQLite</span>
+  </div>
+
+  <!-- Tabla de Métodos -->
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Método Aplicado</th>
+          <th>Tipo / Propósito</th>
+          <th>Estado</th>
+          <th>Iter. / Pasos</th>
+          <th>Tiempo (ms)</th>
+          <th>Aproximación Final</th>
+          <th>Residuo / f(x)</th>
+          <th>Error Relativo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in ejecuciones %}
+        <tr>
+          <td><b>{{ m.metodo }}</b></td>
+          <td>
+            {% if m.metodo in ['Bisección', 'Newton-Raphson', 'Secante', 'Raíz detención (Newton)'] %}
+              <span class="badge" style="background:#f0fdf4; color:#166534;">Búsqueda de Raíces ($t^*$)</span>
+            {% elif m.metodo in ['RK2 (Heun)', 'RK4'] %}
+              <span class="badge" style="background:#eff6ff; color:#1e40af;">Integración EDO ($x, v$)</span>
+            {% elif 'Integral' in m.metodo or m.metodo in ['Trapecio', 'Simpson 1/3', 'Romberg'] %}
+              <span class="badge" style="background:#fdf4ff; color:#86198f;">Integración Numérica</span>
+            {% elif m.metodo in ['Lagrange', 'Newton', 'Splines Cúbicos'] %}
+              <span class="badge" style="background:#ecfdf5; color:#047857;">Interpolación de Señal</span>
+            {% else %}
+              <span class="badge" style="background:#fefce8; color:#854d0e;">Calibración Lineal ($Ax=b$)</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if m.convergio %}
+              <span style="color: var(--success); font-weight: 700;">✔ Sí</span>
+            {% else %}
+              <span style="color: var(--danger); font-weight: 700;">✘ No</span>
+            {% endif %}
+          </td>
+          <td>{{ m.it }}</td>
+          <td>{{ '%.2f' % m.tiempo_ms if m.tiempo_ms is not none else '-' }}</td>
+          <td>
+            {% if m.aprox_str %}
+              <code style="background: var(--bg); padding: 2px 6px; border-radius: 4px;">{{ m.aprox_str }}</code>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>{{ '%.2e' % m.res if m.res is not none else '∞' }}</td>
+          <td><b>{{ '%.2e' % m.er if m.er is not none else '∞' }}</b></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- DOBLE CONCLUSIÓN OBLIGATORIA (Claramente Separadas) -->
+<div class="grid-2">
+  <!-- Conclusión Numérica -->
+  <div class="card" style="border-left: 4px solid var(--primary);">
+    <div class="card-header">
+      <h3 class="card-title" style="color: var(--primary);">Conclusión Numérica (Algoritmos)</h3>
+      <span class="badge badge-blue">Evaluación Matemática</span>
+    </div>
+    <div style="font-size: 0.92rem; color: var(--text); line-height: 1.7;">
+      {% if sim.caso_id == 2 %}
+        {% if sim.tipo == 'NORMAL' %}
+          <p>• <b>Sistemas Lineales:</b> La matriz tridiagonal es estrictamente diagonal dominante y simétrica definida positiva ($\kappa = 2.36$). El radio espectral $\rho(T_J) = 0.4045 < 1$ garantiza la convergencia lineal de Jacobi (21 iteraciones). Gauss-Seidel converge en casi la mitad de pasos (12 iteraciones) debido a que $\rho(T_{GS}) \approx (\rho_J)^2 = 0.1636$. LU y Gradiente Conjugado alcanzan precisión de máquina ($10^{-16}$) en 1 y 4 pasos respectivamente.</p>
+          <p style="margin-top: 8px;">• <b>Búsqueda de Raíces:</b> Newton-Raphson exhibe convergencia cuadrática ($p=2$), alcanzando tolerancia $10^{-8}$ en solo 5 iteraciones ($E_r \sim 10^{-13}$). Secante converge superlinealmente ($p \approx 1.618$) en 7 iteraciones. Bisección requiere 27 iteraciones pero ofrece garantía de convergencia monótona.</p>
+        {% elif sim.tipo == 'ESTRES' %}
+          <p>• <b>Sensibilidad ante Perturbaciones:</b> Todos los métodos de calibración lineal convergen con residuos diminutos ($< 10^{-11}$), pero todos tienen un error relativo del $1.06\%$ respecto a $x^*$. Se demuestra que el error final proviene de la perturbación del 3% en los datos de entrada ($\delta b$), no de limitaciones del algoritmo.</p>
+          <p style="margin-top: 8px;">• <b>Raíces bajo Fatiga:</b> Los tres métodos de raíces calculan el nuevo tiempo al umbral ($6.06\text{ meses}$) de forma estable sin degradación numérica.</p>
+        {% else %}
+          <p>• <b>Mal Condicionamiento vs. Divergencia:</b> Para la matriz de Hilbert ($\kappa \approx 1.55 \times 10^4$), Jacobi diverge exponencialmente por tener $\rho(T_J) = 2.5821 > 1$. Gauss-Seidel se estanca debido a que $\rho(T_{GS}) = 0.9990 \approx 1$. Por el contrario, LU y CG resuelven con residuo cero pero su error relativo se amplifica a $1.92 \times 10^{-3}$ por el número de condición ($\kappa$). Se comprueba estrictamente la cota de sensibilidad.</p>
+        {% endif %}
+      {% elif sim.caso_id == 1 %}
+        <p>• <b>Comparación EDO RK2 vs. RK4:</b> Runge-Kutta 4to orden exhibe un error de truncamiento global de orden $O(h^4)$, reproduciendo la distancia analítica de frenado con un error menor al $0.05\%$. RK2 (Heun), de orden $O(h^2)$, presenta una acumulación de error mayor pero con la mitad del costo de evaluaciones funcionales por paso.</p>
+        <p style="margin-top: 8px;">• <b>Integración Numérica y Raíces:</b> El método del Trapecio reproduce con fidelidad la integral de velocidad $\int v(t) dt$, mientras que la búsqueda de raíces (Newton-Raphson) localiza el instante exacto de detención $v(t)=0$ en 4 iteraciones con precisión de máquina.</p>
+      {% elif sim.caso_id == 3 %}
+        <p>• <b>Resolución EDO (RK4 vs. RK2 Heun):</b> Runge-Kutta 4to orden mantiene estabilidad estricta en régimen subamortiguado y resonante, logrando un error local $O(h^5)$ y global $O(h^4)$ que evita la dispersión artificial de fase. RK2 exhibe ligeras desviaciones de amplitud máxima acumuladas tras 15 segundos de simulación.</p>
+        <p style="margin-top: 8px;">• <b>Integración de Energía Acumulada $\int x^2 dt$:</b> Romberg (extrapolación de Richardson de orden $h^6$) converge rápidamente al valor exacto de disipación energética, mientras que Simpson 1/3 compuesto mejora drásticamente la aproximación de Trapecio con idéntico número de evaluaciones.</p>
+      {% elif sim.caso_id == 4 %}
+        <p>• <b>Análisis de Interpolación y Fenómeno de Runge:</b> Para la función de prueba $f(t) = 1/(1+25t^2)$ con nodos equiespaciados, los polinomios globales de Lagrange y Newton divergen catastróficamente en los extremos del dominio con errores superiores al 1000% debido a la explosión de la derivada de orden superior.</p>
+        <p style="margin-top: 8px;">• <b>Estabilidad de Splines Cúbicos:</b> Los Splines cúbicos naturales garantizan suavidad $C^2$ resolviendo un sistema tridiagonal estrictamente diagonal dominante ($O(n)$ operaciones), logrando un error relativo despreciable ($< 0.2\%$) sin oscilaciones parásitas.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Conclusión del Problema Físico -->
+  <div class="card" style="border-left: 4px solid var(--success);">
+    <div class="card-header">
+      <h3 class="card-title" style="color: var(--success);">Conclusión del Problema Físico (Mi Teleférico)</h3>
+      <span class="badge badge-normal">Operación & Seguridad</span>
+    </div>
+    <div style="font-size: 0.92rem; color: var(--text); line-height: 1.7;">
+      {% if sim.caso_id == 2 %}
+        {% if sim.tipo == 'NORMAL' %}
+          <p>• <b>Planificación de Mantenimiento Preventivo:</b> El componente crítico (cable tractor-portador de acero torsionado) alcanzará el umbral normativo del 60% de desgaste a los <b>14.49 meses</b> de operación ininterrumpida. Esto otorga al departamento de mantenimiento un horizonte seguro de 1 año y 2 meses para planificar la inspección no destructiva (END).</p>
+          <p style="margin-top: 8px;">• <b>Recomendación Operativa:</b> Programar la primera ronda de ensayos electromagnéticos a los 10 meses para verificar la tasa real de microfisuración en alambres externos.</p>
+        {% elif sim.tipo == 'ESTRES' %}
+          <p>• <b>Impacto de la Fatiga Severa y Altitud:</b> Bajo condiciones ambientales extremas de La Paz y retraso en la lubricación ($\alpha = 0.05, \beta = 0.004$), el tiempo hasta el umbral se reduce drásticamente de 14.5 a <b>6.06 meses</b> (una reducción de más del 58% de la vida útil).</p>
+          <p style="margin-top: 8px;">• <b>Acción Inmediata:</b> Requiere duplicar la frecuencia de lubricación e inspección visual en balancines de torres de alta carga.</p>
+        {% else %}
+          <p>• <b>Incertidumbre en Sensores de Desgaste:</b> Demuestra que si la calibración de sensores está mal condicionada ($\kappa$ alto), los reportes de telemetría pueden generar falsas alarmas o enmascarar desgaste real. Es imperativo calibrar contra estándares físicos de laboratorio.</p>
+        {% endif %}
+      {% elif sim.caso_id == 1 %}
+        <p>• <b>Margen de Seguridad en Estación:</b> Para la velocidad nominal de $5.0\text{ m/s}$ y desaceleración de $1.0\text{ m/s}^2$ con 1 segundo de reacción, la cabina se detiene completamente a los $17.50\text{ metros}$, cumpliendo con holgura la vía libre disponible de $20.0\text{ metros}$ con un margen de seguridad de $2.50\text{ metros}$.</p>
+        <p style="margin-top: 8px;">• <b>Límite Operativo:</b> Si la velocidad supera los $5.5\text{ m/s}$ o el tiempo de reacción excede $1.5\text{ s}$, la cabina colisionaría con la estación, exigiendo un sistema de parada redundante.</p>
+      {% elif sim.caso_id == 3 %}
+        <p>• <b>Seguridad ante Ráfagas de Viento en Cañones:</b> En operación normal libre, el amortiguamiento pendular contiene el balanceo dentro de límites confortables ($< 0.50\text{ m}$). Sin embargo, ante ráfagas resonantes a frecuencia propia ($\omega_0 = 2.0\text{ rad/s}$), la cabina supera el gálibo seguro de 0.80 m hacia las estructuras de torre.</p>
+        <p style="margin-top: 8px;">• <b>Protocolo SCADA:</b> La cuantificación de la energía integrada acumulada en tiempo real permite disparar la ralentización preventiva del sistema a 2.0 m/s antes de que se alcance la condición crítica de descarrilamiento.</p>
+      {% elif sim.caso_id == 4 %}
+        <p>• <b>Confiabilidad en Sensores de Cable y Poleas:</b> Si la telemetría del teleférico pierde paquetes o sufre interferencia electromagnética, reconstruir los datos con polinomios globales provocaría falsos disparos de sobretensión o subestimación del desgaste de las zapatas.</p>
+        <p style="margin-top: 8px;">• <b>Adopción de Splines en el Sistema de Control:</b> Los splines cúbicos permiten interpolar de manera robusta y en tiempo real las tensiones de línea, garantizando que el sistema automático de supervisión reciba señales físicamente admisibles y suaves ($C^2$).</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Acordeón Desplegable: Detalle de Iteraciones Paso a Paso -->
+<div class="card">
+  <div class="card-header" style="cursor: pointer;" onclick="document.getElementById('historialDetalle').classList.toggle('active')">
+    <h3 class="card-title" style="font-size: 1.1rem;">
+      🔍 Ver Registro Paso a Paso de Iteraciones de Cada Método
+    </h3>
+    <span style="font-size: 0.85rem; color: var(--accent);">[Clic para desplegar/ocultar]</span>
+  </div>
+  <div id="historialDetalle" class="tab-pane">
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+      Se muestran las primeras iteraciones guardadas en disco para cada método con su aproximación, residuo y error relativo:
+    </p>
+    {% for m in ejecuciones %}
+      <h4 style="color: var(--primary); margin: 1rem 0 0.5rem 0;">{{ m.metodo }} ({{ m.it }} iteraciones registradas):</h4>
+      <div class="table-container" style="max-height: 240px; overflow-y: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Paso ($k$)</th>
+              <th>Aproximación $x^{(k)}$</th>
+              <th>Residuo / $f(x)$</th>
+              <th>Error Absoluto</th>
+              <th>Error Relativo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in m.iteraciones[:15] %}
+            <tr>
+              <td>{{ it.numero }}</td>
+              <td><code>{{ it.aprox_str }}</code></td>
+              <td>{{ '%.2e' % it.residual if it.residual is not none else '∞' }}</td>
+              <td>{{ '%.2e' % it.error_abs if it.error_abs is not none else '-' }}</td>
+              <td><b>{{ '%.2e' % it.error_rel if it.error_rel is not none else '-' }}</b></td>
+            </tr>
+            {% endfor %}
+            {% if m.iteraciones|length > 15 %}
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-muted); font-style: italic;">
+                ... {{ m.iteraciones|length - 15 }} iteraciones intermedias omitidas en la vista previa ...
+              </td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Datos inyectados desde Flask
+  const chartFisicoData = {{ chart_fisico | tojson }};
+  const seriesErrorData = {{ series_error | tojson }};
+
+  // 1. Gráfico Físico (Chart.js)
+  const ctxFisico = document.getElementById('chartFisico').getContext('2d');
+  new Chart(ctxFisico, {
+    type: 'line',
+    data: {
+      labels: chartFisicoData.labels,
+      datasets: chartFisicoData.datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { title: { display: true, text: chartFisicoData.x_label || 'Tiempo (meses)' } },
+        y: { title: { display: true, text: chartFisicoData.y_label || 'Deterioro D(t)' } }
+      },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } }
+      }
+    }
+  });
+
+  // 2. Gráfico de Error y Convergencia Logarítmica (Chart.js)
+  const ctxError = document.getElementById('chartError').getContext('2d');
+  new Chart(ctxError, {
+    type: 'line',
+    data: {
+      labels: seriesErrorData.labels,
+      datasets: seriesErrorData.datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { title: { display: true, text: 'Número de Iteración (k)' } },
+        y: {
+          type: 'logarithmic',
+          title: { display: true, text: 'Error Relativo (escala log)' },
+          min: 1e-17,
+          max: 10
+        }
+      },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } }
+      }
+    }
+  });
+</script>
+{% endblock %}

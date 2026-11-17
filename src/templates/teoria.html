@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Teoría Transversal de Errores · SIMTELE-RISK{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div>
+      <span class="badge badge-blue">Fundamento Transversal</span>
+      <h2 class="card-title" style="margin-top: 0.35rem;">Teoría de Errores Numéricos y Análisis de Estabilidad</h2>
+    </div>
+    <span style="font-size: 0.85rem; color: var(--text-muted);">Aplica a los 4 Módulos</span>
+  </div>
+  
+  <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+    La teoría de errores es <b>transversal</b> en SIMTELE-RISK: no constituye un caso aislado, sino el criterio con el cual se valida cada aproximación numérica frente a soluciones analíticas cerradas o cotas de precisión de referencia.
+  </p>
+
+  <div class="grid-2">
+    <!-- Métrica de Errores -->
+    <div style="background: var(--bg); padding: 1.25rem; border-radius: 8px;">
+      <h3 style="font-size: 1.1rem; color: var(--primary); margin-bottom: 0.75rem;">1. Métricas de Error</h3>
+      <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">
+        Sea $x^*$ el valor o vector exacto de referencia y $\tilde{x}$ la aproximación numérica calculada:
+      </p>
+      <ul style="padding-left: 1.25rem; font-size: 0.88rem; line-height: 1.8;">
+        <li><b>Error Absoluto ($E_a$):</b> $$E_a = \|\tilde{x} - x^*\|_2$$</li>
+        <li><b>Error Relativo ($E_r$):</b> $$E_r = \frac{\|\tilde{x} - x^*\|_2}{\|x^*\|_2} \quad (\text{si } \|x^*\|_2 > 10^{-300})$$
+          <span style="color: var(--primary); font-size: 0.8rem;"><i>* Protección implementada: si el denominador es casi nulo se reporta NaN para evitar división por cero.</i></span>
+        </li>
+        <li><b>Error Porcentual ($E_p$):</b> $$E_p = 100 \times E_r \, [\%]$$</li>
+      </ul>
+    </div>
+
+    <!-- Residuo y Sensibilidad -->
+    <div style="background: var(--bg); padding: 1.25rem; border-radius: 8px;">
+      <h3 style="font-size: 1.1rem; color: var(--primary); margin-bottom: 0.75rem;">2. Residuo y Número de Condición</h3>
+      <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">
+        Para un sistema lineal $A x = b$:
+      </p>
+      <ul style="padding-left: 1.25rem; font-size: 0.88rem; line-height: 1.8;">
+        <li><b>Vector Residual ($r$):</b> $$r = b - A\tilde{x}, \quad \|r\|_2 = \|b - A\tilde{x}\|_2$$</li>
+        <li><b>Número de Condición ($\kappa(A)$):</b> $$\kappa(A) = \|A\|_2 \|A^{-1}\|_2 = \frac{\sigma_{\max}(A)}{\sigma_{\min}(A)}$$</li>
+        <li><b>Teorema Fundamental de Sensibilidad:</b> $$\frac{\|\delta x\|}{\|x\|} \le \kappa(A) \frac{\|\delta b\|}{\|b\|}$$</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Distinción Teórica Crucial -->
+  <div class="alert alert-warning" style="margin-top: 1.5rem;">
+    <h4 style="font-weight: 700; margin-bottom: 0.5rem;">Distinción Teórica Clave: Mal Condicionamiento vs. Falta de Convergencia</h4>
+    <p style="font-size: 0.9rem;">
+      <b>1. Mal Condicionamiento (Propiedad del Problema):</b> Ocurre cuando $\kappa(A) \gg 1$. Los algoritmos directos o iterativos pueden resolver el sistema con residuo prácticamente nulo ($\|r\| \approx 10^{-16}$), pero pequeñas perturbaciones en los datos ($\delta b$) se amplifican por el factor $\kappa(A)$, provocando que el error de la solución respecto al valor real sea significativo.<br>
+      <b>2. Falta de Convergencia (Propiedad del Algoritmo):</b> Ocurre cuando las condiciones de convergencia del método no se satisfacen (por ejemplo, en Jacobi si el radio espectral $\rho(T_J) \ge 1$ por falta de dominancia diagonal, o en Newton si la derivada es casi nula $f'(x) \approx 0$). Es un fallo algorítmico, no una propiedad del problema.
+    </p>
+  </div>
+
+  <!-- Radios Espectrales -->
+  <h3 style="font-size: 1.2rem; color: var(--primary); margin-top: 1.5rem; margin-bottom: 0.75rem;">
+    3. Condiciones de Convergencia en Sistemas Lineales: Radios Espectrales $\rho(T)$
+  </h3>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Método</th>
+          <th>Matriz de Iteración $T$</th>
+          <th>Condición Necesaria y Suficiente</th>
+          <th>Condición Suficiente Práctica</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Jacobi</b></td>
+          <td>$T_J = D^{-1}(L + U)$</td>
+          <td>$\rho(T_J) < 1$</td>
+          <td>Estrictamente diagonal dominante: $|a_{ii}| > \sum_{j \ne i} |a_{ij}|$</td>
+        </tr>
+        <tr>
+          <td><b>Gauss-Seidel</b></td>
+          <td>$T_{GS} = (D - L)^{-1} U$</td>
+          <td>$\rho(T_{GS}) < 1$</td>
+          <td>Simétrica Definida Positiva (SPD) o estrictamente diagonal dominante</td>
+        </tr>
+        <tr>
+          <td><b>Gradiente Conjugado</b></td>
+          <td>Direcciones $A$-ortogonales</td>
+          <td>$A$ simétrica definida positiva ($A = A^T > 0$)</td>
+          <td>En aritmética exacta converge en $\le n$ pasos para matriz $n \times n$</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Métodos de Raíces -->
+  <h3 style="font-size: 1.2rem; color: var(--primary); margin-top: 1.5rem; margin-bottom: 0.75rem;">
+    4. Tasas de Convergencia en Métodos de Búsqueda de Raíces ($f(x) = 0$)
+  </h3>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Método</th>
+          <th>Fórmula de Iteración</th>
+          <th>Orden de Convergencia ($p$)</th>
+          <th>Requisitos y Sensibilidades</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Bisección</b></td>
+          <td>$c_{k} = \frac{a_k + b_k}{2}$</td>
+          <td>Lineal ($p = 1$, error se divide entre 2)</td>
+          <td>Requiere cambio de signo inicial $f(a) \cdot f(b) < 0$. Siempre converge.</td>
+        </tr>
+        <tr>
+          <td><b>Secante</b></td>
+          <td>$x_{k+1} = x_k - f(x_k) \frac{x_k - x_{k-1}}{f(x_k) - f(x_{k-1})}$</td>
+          <td>Superlineal ($p \approx 1.618$)</td>
+          <td>Requiere dos semillas iniciales. No necesita calcular derivadas analíticas.</td>
+        </tr>
+        <tr>
+          <td><b>Newton-Raphson</b></td>
+          <td>$x_{k+1} = x_k - \frac{f(x_k)}{f'(x_k)}$</td>
+          <td>Cuadrática ($p = 2$, duplica cifras por paso)</td>
+          <td>Requiere $f'(x) \ne 0$. Si $f'(x^*) \approx 0$ (raíz cuasi-múltiple), se degrada a orden lineal.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

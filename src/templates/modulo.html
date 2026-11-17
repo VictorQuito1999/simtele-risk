@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+
+{% block title %}Módulo {{ caso.id }}: {{ caso.nombre }} · SIMTELE-RISK{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+  <a href="/" style="text-decoration: none; color: var(--accent); font-weight: 600; font-size: 0.9rem;">← Volver al Panel Principal</a>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div>
+      <span class="badge badge-blue">Caso de Estudio {{ caso.id }}</span>
+      <h1 class="card-title" style="margin-top: 0.35rem; font-size: 1.6rem;">
+        {{ caso.nombre }}
+      </h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">{{ caso.descripcion }}</p>
+    </div>
+    <div style="text-align: right;">
+      <span class="badge {% if caso.activo %}badge-normal{% else %}badge-estres{% endif %}">
+        {% if caso.activo %}Implementado S1/S2{% else %}Formulación Teórica S2{% endif %}
+      </span>
+    </div>
+  </div>
+
+  <!-- Pestañas de Navegación del Módulo -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="openTab(event, 'tab-teoria')">1. Modelo Físico & Teoría</button>
+    <button class="tab-btn" onclick="openTab(event, 'tab-simulador')">2. Simulador Interactivo</button>
+    <button class="tab-btn" onclick="openTab(event, 'tab-sistemas')">3. Enfoque Ingeniería de Sistemas</button>
+  </div>
+
+  <!-- PESTAÑA 1: MODELO FÍSICO Y TEORÍA -->
+  <div id="tab-teoria" class="tab-pane active">
+    {% if caso.id == 2 %}
+      <!-- TEORÍA MÓDULO 2 -->
+      <h3 style="color: var(--primary); margin-bottom: 0.75rem;">1. Planteamiento Físico del Deterioro Mecánico</h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
+        En los teleféricos monocable tipo Doppelmayr (Mi Teleférico), el cable portador-tractor y las mordazas desembragables están sometidos a ciclos continuos de flexión y fatiga por paso sobre balancines y poleas en estaciones.
+        El modelo cuadrático de deterioro continuo representa el daño acumulado $D(t) \in [0, 1]$ a lo largo del tiempo $t$ (en meses):
+      </p>
+      
+      <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1rem;">
+        $$\text{Ecuación de Degradación: } D(t) = D_0 + \alpha t + \beta t^2$$
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 8px;">
+          Donde <b>$D_0$</b> es el daño inicial residual, <b>$\alpha$</b> es la tasa de desgaste lineal por fricción, y <b>$\beta$</b> es la aceleración cuadrática por fatiga de alambres y pérdida de lubricación.
+        </p>
+      </div>
+
+      <h4 style="color: var(--primary); margin: 1rem 0 0.5rem 0;">Cruce de Umbral y Referencia Analítica Exacta</h4>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+        La parada técnica preventiva se programa cuando $D(t)$ alcanza el umbral de inspección admisible $D_{\text{umbral}}$ (según norma europea EN 12927):
+      </p>
+      <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1rem;">
+        $$f(t) = \beta t^2 + \alpha t + (D_0 - D_{\text{umbral}}) = 0 \implies t^* = \frac{-\alpha + \sqrt{\alpha^2 - 4\beta(D_0 - D_{\text{umbral}})}}{2\beta}$$
+      </div>
+
+      <h4 style="color: var(--primary); margin: 1rem 0 0.5rem 0;">Parámetros del Componente y Fuentes de Ingeniería</h4>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Parámetro</th>
+              <th>Símbolo</th>
+              <th>Unidad</th>
+              <th>Valor Nominal</th>
+              <th>Fuente y Justificación de Ingeniería</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Deterioro Inicial</td>
+              <td>$D_0$</td>
+              <td>adimensional</td>
+              <td>0.10 (10%)</td>
+              <td>Estado verificado tras puesta en servicio o inspección previa.</td>
+            </tr>
+            <tr>
+              <td>Tasa Lineal</td>
+              <td>$\alpha$</td>
+              <td>$\text{mes}^{-1}$</td>
+              <td>0.02 (2%/mes)</td>
+              <td>Desgaste regular por fricción superficial en poleas de línea.</td>
+            </tr>
+            <tr>
+              <td>Aceleración Cuadrática</td>
+              <td>$\beta$</td>
+              <td>$\text{mes}^{-2}$</td>
+              <td>0.001</td>
+              <td>Fatiga cíclica de alambres externos y microfisuras progresivas.</td>
+            </tr>
+            <tr>
+              <td>Umbral de Inspección</td>
+              <td>$D_{\text{umbral}}$</td>
+              <td>adimensional</td>
+              <td>0.60 (60%)</td>
+              <td>Límite admisible según EN 12927 antes de requerir corte/empalme.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    {% elif caso.id == 1 %}
+      <!-- TEORÍA MÓDULO 1 -->
+      <h3 style="color: var(--primary); margin-bottom: 0.75rem;">1. Planteamiento Físico de la Detención de Emergencia</h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Ante una activación de parada de emergencia cuando una cabina entra a estación, el sistema distingue dos fases físicas obligatorias:
+      </p>
+      
+      <div class="grid-2" style="margin-bottom: 1rem;">
+        <div style="background: var(--bg); padding: 1rem; border-radius: 8px;">
+          <b>Fase 1: Tiempo de Reacción ($t_r$):</b>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">
+            Retardo electromecánico e hidráulico de activación de mordazas. La cabina continúa a velocidad constante $v_0$:<br>
+            $$d_{\text{reaccion}} = v_0 \cdot t_r$$
+          </p>
+        </div>
+        <div style="background: var(--bg); padding: 1rem; border-radius: 8px;">
+          <b>Fase 2: Frenado Efectivo ($t_f$):</b>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">
+            Actúa la desaceleración constante de servicio $a$ hasta alcanzar velocidad nula $v=0$:<br>
+            $$t_f = \frac{v_0}{a}, \quad d_{\text{frenado}} = \frac{v_0^2}{2a}$$
+          </p>
+        </div>
+      </div>
+
+      <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1rem;">
+        $$\text{Distancia Total Requerida: } d_{\text{total}} = d_{\text{reaccion}} + d_{\text{frenado}} = v_0 t_r + \frac{v_0^2}{2a}$$
+        $$\text{Margen de Seguridad: } M = L - d_{\text{total}} \ge 0$$
+      </div>
+
+      <h4 style="color: var(--primary); margin: 1rem 0 0.5rem 0;">Sistema de Ecuaciones Diferenciales Ordinarias (EDO)</h4>
+      <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1rem;">
+        $$\frac{dx}{dt} = v, \quad \frac{dv}{dt} = -a(v, t), \quad \text{con } x(0) = 0, \ v(0) = v_0$$
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
+          Resuelto mediante <b>Runge-Kutta de 2do orden (Heun)</b> y <b>Runge-Kutta de 4to orden (RK4)</b>, integrando $v(t)$ con <b>Trapecio compuesto</b> y encontrando el instante de detención $v(t)=0$ con <b>Bisección, Newton y Secante</b>.
+        </p>
+      </div>
+
+    {% elif caso.id == 3 %}
+      <!-- TEORÍA MÓDULO 3 -->
+      <h3 style="color: var(--primary); margin-bottom: 0.75rem;">1. Dinámica de Oscilaciones Transversales por Viento</h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
+        En la topografía de La Paz y El Alto, los teleféricos atraviesan cañones y pendientes pronunciadas donde se registran ráfagas laterales de viento de alta intensidad.
+        El modelo físico describe el balanceo transversal del conjunto cabina-pasajeros suspendido del cable portador-tractor mediante un oscilador de segundo orden:
+      </p>
+      
+      <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1rem;">
+        $$m \ddot{x}(t) + c \dot{x}(t) + k x(t) = F(t) = F_0 \cos(\omega_f t)$$
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 6px;">
+          Donde <b>$m$</b> es la masa total (cabina vacía + pasajeros), <b>$c$</b> es el coeficiente de amortiguamiento viscoso del perno/articulación de suspensión, <b>$k$</b> es la rigidez restauradora transversal del vano de cable, y <b>$F(t)$</b> modela el desprendimiento de vórtices y ráfagas periódicas de viento.
+        </p>
+      </div>
+
+      <h4 style="color: var(--primary); margin: 1rem 0 0.5rem 0;">Sistema de EDO y Solución Analítica de Referencia</h4>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+        El sistema se transforma a espacio de estados para ser resuelto por métodos numéricos (Heun RK2 y RK4):
+      </p>
+      <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1rem;">
+        $$\begin{cases} \dfrac{dx}{dt} = v \\ \dfrac{dv}{dt} = \dfrac{F_0 \cos(\omega_f t) - c v - k x}{m} \end{cases}$$
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 6px;">
+          En régimen libre ($F_0=0$) subamortiguado ($\zeta < 1$), la <b>solución analítica exacta</b> es:
+          $$x_{\text{analítica}}(t) = e^{-\zeta \omega_0 t} \left[ C_1 \cos(\omega_d t) + C_2 \sin(\omega_d t) \right]$$
+          con $\omega_0 = \sqrt{\frac{k}{m}}, \quad \zeta = \frac{c}{2\sqrt{km}}, \quad \omega_d = \omega_0 \sqrt{1 - \zeta^2}, \quad C_1 = x_0, \quad C_2 = \frac{v_0 + \zeta \omega_0 x_0}{\omega_d}$.
+        </p>
+      </div>
+
+      <h4 style="color: var(--primary); margin: 1rem 0 0.5rem 0;">Integración de Magnitud Acumulada (Energía de Oscilación)</h4>
+      <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1rem;">
+        $$E_{\text{acum}} = \int_0^T [x(t)]^2 \, dt$$
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 6px;">
+          Calculada mediante <b>Trapecio compuesto</b>, <b>Simpson 1/3 compuesto</b> y <b>Romberg</b> (extrapolación de Richardson), permitiendo cuantificar la fatiga estructural cíclica acumulada en la pinza de suspensión.
+        </p>
+      </div>
+
+      <h4 style="color: var(--primary); margin: 1rem 0 0.5rem 0;">Parámetros Nominales del Sistema Dinámico</h4>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Parámetro</th>
+              <th>Símbolo</th>
+              <th>Unidad</th>
+              <th>Valor Nominal</th>
+              <th>Significado Físico / Norma</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Masa Cabina + Carga</td>
+              <td>$m$</td>
+              <td>$\text{kg}$</td>
+              <td>3000</td>
+              <td>Cabina Doppelmayr 10-MGD (1800 kg tara + 10 personas a 80 kg y equipaje).</td>
+            </tr>
+            <tr>
+              <td>Coef. Amortiguamiento</td>
+              <td>$c$</td>
+              <td>$\text{N}\cdot\text{s/m}$</td>
+              <td>600</td>
+              <td>Amortiguador elastómero en la cabeza del péndulo de fijación.</td>
+            </tr>
+            <tr>
+              <td>Rigidez Transversal</td>
+              <td>$k$</td>
+              <td>$\text{N/m}$</td>
+              <td>12000</td>
+              <td>Rigidez elástica restauradora del vano de cable tensionado a 400 kN.</td>
+            </tr>
+            <tr>
+              <td>Amplitud de Ráfaga</td>
+              <td>$F_0$</td>
+              <td>$\text{N}$</td>
+              <td>800</td>
+              <td>Presión aerodinámica lateral a 60 km/h sobre área transversal de 4.8 m².</td>
+            </tr>
+            <tr>
+              <td>Límite Gálibo Seguro</td>
+              <td>$x_{\text{adm}}$</td>
+              <td>$\text{m}$</td>
+              <td>0.80</td>
+              <td>Gálibo lateral admisible respecto a la estructura de torres (EN 12929-1).</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    {% elif caso.id == 4 %}
+      <!-- TEORÍA MÓDULO 4 -->
+      <h3 style="color: var(--primary); margin-bottom: 0.75rem;">1. Reconstrucción de Telemetría y Fenómeno de Runge</h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
+        La seguridad y control del teleférico dependen del monitoreo continuo de sensores: células de carga (tensión del cable portador-tractor), anemómetros ultrasónicos en torres y tacómetros ópticos de poleas motrices.
+        Frecuentemente ocurren pérdidas de paquetes de telemetría por interferencia electromagnética o ruido térmico.
+      </p>
+
+      <div class="grid-2" style="margin-bottom: 1rem;">
+        <div style="background: var(--bg); padding: 1rem; border-radius: 8px;">
+          <b>Interpolación Polinómica Global:</b>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">
+            • <b>Lagrange:</b> $P_n(t) = \sum_{i=0}^n y_i \prod_{j \ne i} \frac{t - t_j}{t_i - t_j}$<br>
+            • <b>Newton:</b> $P_n(t) = f[t_0] + \sum_{k=1}^n f[t_0,\dots,t_k] \prod_{j=0}^{k-1}(t - t_j)$<br>
+            Ambos métodos construyen el polinomio interpolador único de grado $n$.
+          </p>
+        </div>
+        <div style="background: var(--bg); padding: 1rem; border-radius: 8px;">
+          <b>Splines Cúbicos Naturales ($C^2$):</b>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">
+            Polinomios cúbicos a trozos $S_i(t)$ en cada intervalo $[t_i, t_{i+1}]$ que garantizan continuidad de valor, pendiente ($S'$) y curvatura ($S''$), con condición de frontera libre $S''(t_0) = S''(t_n) = 0$.
+          </p>
+        </div>
+      </div>
+
+      <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1rem;">
+        $$\text{Fórmula del Error Polinómico: } E(t) = f(t) - P_n(t) = \frac{f^{(n+1)}(\xi)}{(n+1)!} \prod_{i=0}^n (t - t_i)$$
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 6px;">
+          <b>Fenómeno de Runge:</b> Para la función de prueba $f(t) = \frac{1}{1 + 25 t^2}$, al aumentar el número de nodos equiespaciados $n$, la derivada $(n+1)$-ésima crece más rápido que $(n+1)!$, produciendo divergencia exponencial en los extremos del dominio ($|E(t)| \to \infty$). Los <b>Splines cúbicos</b> eliminan este defecto.
+        </p>
+      </div>
+
+      <h4 style="color: var(--primary); margin: 1rem 0 0.5rem 0;">Protocolo de Validación de Reconstrucción</h4>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+        Se ocultan deliberadamente puntos de control conocidos $\{t_{\text{test}}\}$ de la señal real $y_{\text{real}}(t)$.
+        Cada algoritmo infiere $\hat{y}(t_{\text{test}})$ utilizando únicamente los nodos disponibles, evaluando el error relativo cuadrático medio:
+      </p>
+      <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1rem;">
+        $$E_{\text{rel}} = \frac{\frac{1}{M}\sum_{k=1}^M |\hat{y}(t_k) - y_{\text{real}}(t_k)|}{\frac{1}{M}\sum_{k=1}^M |y_{\text{real}}(t_k)| + \epsilon}$$
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- PESTAÑA 2: SIMULADOR INTERACTIVO -->
+  <div id="tab-simulador" class="tab-pane">
+    <h3 style="color: var(--primary); margin-bottom: 0.75rem;">Configurar y Ejecutar Simulación</h3>
+    <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+      Seleccione uno de los tres escenarios normalizados o ajuste los parámetros físicamente admisibles. Los resultados se calcularán en el motor numérico y se persistirán en la base de datos SQLite.
+    </p>
+
+    <!-- Botones de Escenario Rápido -->
+    <div style="margin-bottom: 1.5rem;">
+      <b style="font-size: 0.9rem; color: var(--text); display: block; margin-bottom: 0.5rem;">Escenarios Normalizados:</b>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="/correr/{{ caso.id }}/NORMAL" class="btn btn-outline" style="border-color: #16a34a; color: #16a34a;">
+          🟢 Ejecutar Escenario NORMAL
+        </a>
+        <a href="/correr/{{ caso.id }}/ESTRES" class="btn btn-outline" style="border-color: #ca8a04; color: #ca8a04;">
+          🟡 Ejecutar Escenario ESTRÉS
+        </a>
+        <a href="/correr/{{ caso.id }}/MAL_CONDICIONADO" class="btn btn-outline" style="border-color: #dc2626; color: #dc2626;">
+          🔴 Ejecutar Escenario MAL CONDICIONADO
+        </a>
+      </div>
+    </div>
+
+    <!-- Formulario de Parámetros Personalizados -->
+    <div style="background: var(--bg); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border);">
+      <h4 style="font-size: 1rem; color: var(--primary); margin-bottom: 1rem;">Formulario de Simulación Personalizada</h4>
+      
+      {% if caso.id == 2 %}
+      <form action="/simular-custom/2" method="POST">
+        <div class="grid-2">
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Deterioro Inicial ($D_0$):</label>
+            <input type="number" step="0.01" min="0" max="0.99" name="D0" value="0.10" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Fracción inicial de desgaste (ej: 0.10 = 10%)</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Tasa Lineal ($\alpha$):</label>
+            <input type="number" step="0.001" min="0" max="0.5" name="alpha" value="0.02" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Desgaste por fricción en $\text{mes}^{-1}$</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Aceleración Cuadrática ($\beta$):</label>
+            <input type="number" step="0.0001" min="0" max="0.1" name="beta" value="0.001" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Fatiga y microfisuras en $\text{mes}^{-2}$</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Umbral de Inspección ($D_{\text{umbral}}$):</label>
+            <input type="number" step="0.01" min="0.1" max="1.0" name="Dumbral" value="0.60" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Criterio de parada técnica (ej: 0.60 = 60%)</small>
+          </div>
+        </div>
+        <div style="margin-top: 1.25rem;">
+          <button type="submit" class="btn">🚀 Ejecutar Cálculo y Guardar en Historial</button>
+        </div>
+      </form>
+      {% elif caso.id == 1 %}
+      <form action="/simular-custom/1" method="POST">
+        <div class="grid-2">
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Velocidad Inicial ($v_0$ m/s):</label>
+            <input type="number" step="0.1" min="1" max="10" name="v0" value="5.0" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Velocidad de crucero comercial</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Desaceleración ($a$ m/s²):</label>
+            <input type="number" step="0.05" min="0.2" max="2.5" name="a" value="1.0" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Desaceleración nominal de zapatas</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Tiempo de Reacción ($t_r$ s):</label>
+            <input type="number" step="0.1" min="0.1" max="5.0" name="tr" value="1.0" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Retardo electromecánico del sistema</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Distancia Disponible ($L$ m):</label>
+            <input type="number" step="0.5" min="5" max="100" name="L" value="20.0" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Vía libre hasta andén de estación</small>
+          </div>
+        </div>
+        <div style="margin-top: 1.25rem;">
+          <button type="submit" class="btn">🚀 Ejecutar Simulación EDO (RK2/RK4)</button>
+        </div>
+      </form>
+      {% elif caso.id == 3 %}
+      <form action="/simular-custom/3" method="POST">
+        <div class="grid-2">
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Masa Total ($m$ kg):</label>
+            <input type="number" step="50" min="500" max="10000" name="m" value="3000" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Cabina + carga de pasajeros (nominal: 3000 kg)</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Amortiguamiento ($c$ N·s/m):</label>
+            <input type="number" step="10" min="1" max="5000" name="c" value="600" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Amortiguador de suspensión pendular</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Rigidez Transversal ($k$ N/m):</label>
+            <input type="number" step="100" min="1000" max="50000" name="k" value="12000" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Rigidez elástica del vano de cable</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Fuerza Ráfaga de Viento ($F_0$ N):</label>
+            <input type="number" step="50" min="0" max="5000" name="F0" value="800" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Amplitud de fuerza periódica lateral</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Frecuencia Excitación ($\omega_f$ rad/s):</label>
+            <input type="number" step="0.05" min="0" max="10.0" name="omega_f" value="1.50" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Frecuencia de ráfagas ($\omega_0 = 2.0$ rad/s es resonancia)</small>
+          </div>
+        </div>
+        <div style="margin-top: 1.25rem;">
+          <button type="submit" class="btn">🚀 Ejecutar Simulación Dinámica y Energía (RK2 / RK4)</button>
+        </div>
+      </form>
+      {% elif caso.id == 4 %}
+      <form action="/simular-custom/4" method="POST">
+        <div class="grid-2">
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Número de Nodos Muestreados ($n$):</label>
+            <input type="number" step="1" min="4" max="25" name="n_nodos" value="10" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Cantidad de lecturas válidas disponibles en el sensor</small>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Nivel de Ruido Gaussiano ($\sigma$):</label>
+            <input type="number" step="0.01" min="0.0" max="0.5" name="ruido" value="0.02" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
+            <small style="color: var(--text-muted);">Desviación estándar de interferencia en telemetría</small>
+          </div>
+          <div style="grid-column: span 2;">
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Señal Física a Reconstruir:</label>
+            <select name="tipo_func" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text);">
+              <option value="sin" selected>Señal Armónica Estándar: y(t) = sin(t) en [0, π]</option>
+              <option value="runge">Función de Prueba de Runge: f(t) = 1 / (1 + 25t²) en [-1, 1]</option>
+            </select>
+            <small style="color: var(--text-muted);">Prueba de susceptibilidad al Fenómeno de Runge en interpolación polinómica global</small>
+          </div>
+        </div>
+        <div style="margin-top: 1.25rem;">
+          <button type="submit" class="btn">🚀 Ejecutar Reconstrucción (Lagrange vs Newton vs Splines)</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- PESTAÑA 3: ENFOQUE INGENIERÍA DE SISTEMAS -->
+  <div id="tab-sistemas" class="tab-pane">
+    <h3 style="color: var(--primary); margin-bottom: 0.75rem;">Diseño y Requisitos de Ingeniería de Sistemas</h3>
+    <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+      Desde la mención de Ingeniería de Sistemas, la solución no se limita a calcular fórmulas numéricas, sino a estructurar un <b>sistema verificable de gestión de activos y mitigación de riesgos operacionales</b>.
+    </p>
+
+    <h4 style="color: var(--primary); margin-bottom: 0.5rem;">Requisitos Funcionales (RF) Implementados</h4>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Nombre del Requisito</th>
+            <th>Descripción y Criterio de Aceptación</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>RF01</b></td>
+            <td>Registro de Escenarios</td>
+            <td>El sistema permite parametrizar las condiciones operativas y almacenarlas con versionado.</td>
+          </tr>
+          <tr>
+            <td><b>RF02</b></td>
+            <td>Validación Física de Entradas</td>
+            <td>Bloquea variables no físicas (desaceleraciones negativas, deterioros mayores al 100%).</td>
+          </tr>
+          <tr>
+            <td><b>RF03</b></td>
+            <td>Cálculo Multi-Método</td>
+            <td>Ejecuta simultáneamente métodos directos, iterativos y de raíces sobre el mismo problema.</td>
+          </tr>
+          <tr>
+            <td><b>RF04</b></td>
+            <td>Evaluación de Restricciones</td>
+            <td>Contrasta la distancia calculada contra el límite de vía libre o el tiempo al umbral normativo.</td>
+          </tr>
+          <tr>
+            <td><b>RF05</b></td>
+            <td>Persistencia y Recuperabilidad</td>
+            <td>Garantiza que toda simulación se guarde en SQLite y se pueda recuperar y relanzar con idéntico resultado.</td>
+          </tr>
+          <tr>
+            <td><b>RF06</b></td>
+            <td>Análisis Gráfico Dual</td>
+            <td>Presenta simultáneamente el gráfico del fenómeno físico y la curva de convergencia logarítmica.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4 style="color: var(--primary); margin: 1.5rem 0 0.5rem 0;">Matriz Preliminar de Riesgos Operativos</h4>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>ID Riesgo</th>
+            <th>Escenario de Peligro</th>
+            <th>Impacto</th>
+            <th>Medida de Mitigación Numérica</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>R-01</b></td>
+            <td>Pérdida de fuerza de frenado ($a < 0.6\text{ m/s}^2$)</td>
+            <td>Crítico (Colisión en estación)</td>
+            <td>Simulación en escenario de ESTRÉS con alerta visual temprana.</td>
+          </tr>
+          <tr>
+            <td><b>R-02</b></td>
+            <td>Retraso en ventana de mantenimiento de cable</td>
+            <td>Alto (Falla por fatiga)</td>
+            <td>Cálculo de vida útil remanente (RUL) mediante búsqueda de raíces con tolerancia $< 10^{-8}$.</td>
+          </tr>
+          <tr>
+            <td><b>R-03</b></td>
+            <td>Incertidumbre en lecturas de sensores de línea</td>
+            <td>Medio (Falsa alarma o desvío)</td>
+            <td>Análisis de sensibilidad con cota $\|\delta x\|/\|x\| \le \kappa(A) \|\delta b\|/\|b\|$.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

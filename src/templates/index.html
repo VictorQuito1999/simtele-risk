@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio · SIMTELE-RISK{% endblock %}
+
+{% block content %}
+<div style="background: linear-gradient(135deg, #1e3a8a 0%, #0284c7 100%); color: white; padding: 2.5rem 2rem; border-radius: var(--radius); margin-bottom: 2rem; box-shadow: var(--shadow-lg);">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase;">
+        Desafío Integrador Final · Métodos Numéricos
+      </span>
+      <h1 style="font-size: 2.2rem; font-weight: 800; margin-top: 0.75rem; letter-spacing: -0.5px;">
+        SIMTELE-RISK
+      </h1>
+      <p style="font-size: 1.1rem; opacity: 0.95; max-width: 800px; margin-top: 0.5rem;">
+        Sistema integrado de simulación matemática, análisis de seguridad operacional y mantenimiento predictivo inspirado en la red urbana de <b>Mi Teleférico</b> (La Paz – El Alto, Bolivia).
+      </p>
+    </div>
+    <div style="text-align: right; background: rgba(0,0,0,0.2); padding: 1rem 1.25rem; border-radius: 8px;">
+      <div style="font-size: 0.8rem; opacity: 0.8;">ESTADO DEL PROYECTO</div>
+      <div style="font-size: 1.25rem; font-weight: 700;">Semana 2: Activa</div>
+      <div style="font-size: 0.85rem; color: #86efac;">4 Casos · Persistencia SQLite</div>
+    </div>
+  </div>
+</div>
+
+<!-- Cuatro Módulos de Estudio -->
+<h2 style="font-size: 1.5rem; font-weight: 700; color: var(--primary); margin-bottom: 1.25rem;">
+  Los Cuatro Casos de Estudio Obligatorios
+</h2>
+
+<div class="grid-2">
+  <!-- Módulo 1 -->
+  <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <span class="badge badge-blue">Caso 1 · Activo S2</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">EDO + Raíces + Integración</span>
+      </div>
+      <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.5rem;">
+        1. Detención de Emergencia de Cabinas
+      </h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Análisis del frenado de seguridad en aproximación a estación. Modela dos fases críticas: <i>tiempo de reacción</i> ($t_r$) y <i>frenado efectivo</i> ($a$). Determina si la distancia calculada cumple el límite físico $L$ disponible.
+      </p>
+      <div style="background: var(--bg); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem;">
+        <b>Ecuaciones:</b> $\frac{dx}{dt} = v, \quad \frac{dv}{dt} = -a(v,t)$<br>
+        <b>Modelos analíticos:</b> $d_{\text{total}} = v_0 t_r + \frac{v_0^2}{2a}$
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+      <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">RK2, RK4, Trapecio, Raíces</span>
+      <a href="/modulo/1" class="btn btn-sm">Explorar Módulo 1 →</a>
+    </div>
+  </div>
+
+  <!-- Módulo 2 -->
+  <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-color: #38bdf8; box-shadow: var(--shadow-lg);">
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <span class="badge badge-normal">Caso 2 · Activo S1/S2</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Sistemas Lineales + Raíces</span>
+      </div>
+      <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.5rem;">
+        2. Deterioro Mecánico y Mantenimiento
+      </h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Monitoreo predictivo del desgaste acumulado en cables tractores-portadores y mordazas. Calibra coeficientes mediante sistemas lineales ($A x = b$) y calcula el tiempo exacto al umbral $D_{\text{umbral}}$ con Bisección, Newton y Secante.
+      </p>
+      <div style="background: var(--bg); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem;">
+        <b>Ecuaciones:</b> $D(t) = D_0 + \alpha t + \beta t^2$<br>
+        <b>Calibración & Raíces:</b> $A x = b \quad \text{y} \quad D(t^*) - D_{\text{umbral}} = 0$
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+      <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">Jacobi, GS, LU, CG, Newton</span>
+      <a href="/modulo/2" class="btn btn-sm">Explorar Módulo 2 →</a>
+    </div>
+  </div>
+
+  <!-- Módulo 3 -->
+  <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <span class="badge" style="background:#f1f5f9; color:#475569;">Caso 3 · En Desarrollo</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">EDO 2° Orden + Integración</span>
+      </div>
+      <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.5rem;">
+        3. Oscilaciones de Cabina por Viento
+      </h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Dinámica pendular de la cabina bajo ráfagas de viento lateral en altura. Simula régimen subamortiguado con $m \ddot{x} + c \dot{x} + k x = F(t)$ y evalúa la energía de balanceo acumulada $\int x^2 dt$.
+      </p>
+      <div style="background: var(--bg); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem;">
+        <b>Parámetros:</b> $m=3000\text{ kg}, c=600\text{ Ns/m}, k=12000\text{ N/m}, F=800\text{ N}$
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+      <span style="font-size: 0.8rem; color: var(--text-muted);">Semana 2/3</span>
+      <a href="/modulo/3" class="btn btn-sm btn-outline">Ver Formulación →</a>
+    </div>
+  </div>
+
+  <!-- Módulo 4 -->
+  <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <span class="badge" style="background:#f1f5f9; color:#475569;">Caso 4 · En Desarrollo</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Interpolación Polinómica & Splines</span>
+      </div>
+      <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.5rem;">
+        4. Reconstrucción de Señales de Sensores
+      </h3>
+      <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Reconstrucción de lecturas faltantes en sensores de tensión de cable y velocidad de línea. Compara Lagrange, Newton por diferencias divididas y Splines cúbicos frente al fenómeno de Runge y datos ruidosos.
+      </p>
+      <div style="background: var(--bg); padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem;">
+        <b>Modelos:</b> Nodos equiespaciados vs Chebyshev, señal $y(t) = \sin(t) + \varepsilon$
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+      <span style="font-size: 0.8rem; color: var(--text-muted);">Semana 2/3</span>
+      <a href="/modulo/4" class="btn btn-sm btn-outline">Ver Formulación →</a>
+    </div>
+  </div>
+</div>
+
+<!-- Marco Teórico y de Ingeniería -->
+<div class="card" style="margin-top: 2rem;">
+  <div class="card-header">
+    <h3 class="card-title">Marco de Ingeniería y Descargo Técnico</h3>
+    <span class="badge badge-blue">Normas EN 12929-1 & EN 12927</span>
+  </div>
+  <p style="font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1rem;">
+    Este software es un <b>simulador estrictamente académico</b>. Los escenarios son hipótesis de cálculo formuladas para contrastar métodos numéricos. No describe fallas verificadas de la empresa estatal Mi Teleférico ni interactúa con PLC o sistemas SCADA reales.
+  </p>
+  <div class="grid-3" style="font-size: 0.88rem;">
+    <div style="background: var(--bg); padding: 1rem; border-radius: 6px;">
+      <b style="color: var(--primary);">Normativa Europea EN 12929-1:</b>
+      <p style="color: var(--text-muted); margin-top: 4px;">Fija desaceleraciones de confort ($0.8 - 1.0\text{ m/s}^2$) y distancias mínimas de vía libre de seguridad en estaciones.</p>
+    </div>
+    <div style="background: var(--bg); padding: 1rem; border-radius: 6px;">
+      <b style="color: var(--primary);">Normativa EN 12927 (Cables):</b>
+      <p style="color: var(--text-muted); margin-top: 4px;">Establece los umbrales de descarte por alambres rotos, pérdida de sección metálica y fatiga cíclica en cables portadores-tractores.</p>
+    </div>
+    <div style="background: var(--bg); padding: 1rem; border-radius: 6px;">
+      <b style="color: var(--primary);">Persistencia Relacional SQLite:</b>
+      <p style="color: var(--text-muted); margin-top: 4px;">Cumple con el almacenamiento estructurado en 6 entidades y la prueba obligatoria de recuperación y relanzamiento sin variables en memoria.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

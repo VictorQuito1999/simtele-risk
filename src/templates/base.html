@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SIMTELE-RISK{% endblock %} · Métodos Numéricos</title>
+  
+  <!-- Estilos Modernos y Responsivos -->
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-hover: #172554;
+      --accent: #0284c7;
+      --accent-light: #e0f2fe;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --warning: #ca8a04;
+      --danger: #dc2626;
+      --radius: 10px;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    
+    /* Navbar */
+    .navbar {
+      background-color: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+    }
+    .nav-container {
+      max-width: 1200px;
+      margin: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.85rem 1.5rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--primary);
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: -0.5px;
+    }
+    .brand span { color: var(--accent); }
+    .nav-links {
+      display: flex;
+      gap: 1.25rem;
+      align-items: center;
+      list-style: none;
+    }
+    .nav-links a {
+      text-decoration: none;
+      color: var(--text);
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active {
+      color: var(--primary);
+      background-color: var(--accent-light);
+    }
+    .nav-badge {
+      font-size: 0.75rem;
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+
+    /* Main Container */
+    .container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+    
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 1.5rem;
+    }
+    .card-header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-normal { background: #dcfce7; color: #15803d; }
+    .badge-estres { background: #fef9c3; color: #a16207; }
+    .badge-mal { background: #fee2e2; color: #b91c1c; }
+    .badge-blue { background: #e0f2fe; color: #0369a1; }
+    
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--primary);
+      color: white;
+      text-decoration: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: var(--primary-hover); }
+    .btn-outline {
+      background: transparent;
+      color: var(--primary);
+      border: 1px solid var(--primary);
+    }
+    .btn-outline:hover {
+      background: var(--accent-light);
+    }
+    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+    
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      margin: 1rem 0;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+    th {
+      background: #f1f5f9;
+      color: #334155;
+      padding: 0.75rem 1rem;
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+    }
+    td {
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tr:hover td { background-color: #f8fafc; }
+    
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+    .tab-btn {
+      padding: 0.75rem 1.25rem;
+      background: none;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: var(--primary); }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    
+    /* Grid */
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+    
+    /* Alerts */
+    .alert {
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      font-size: 0.92rem;
+      border-left: 4px solid;
+    }
+    .alert-info { background: #f0f9ff; border-color: #0284c7; color: #0369a1; }
+    .alert-success { background: #f0fdf4; border-color: #22c55e; color: #15803d; }
+    .alert-warning { background: #fefce8; border-color: #eab308; color: #854d0e; }
+    .alert-danger { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+    
+    /* Footer */
+    footer {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 2rem 0;
+      margin-top: 4rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+  </style>
+  
+  <!-- Chart.js para Gráficos Dinámicos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- MathJax para Fórmulas Matemáticas LaTeX -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Barra de Navegación -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="/" class="brand">
+        🚠 SIMTELE-<span>RISK</span>
+        <span class="nav-badge">Semana 2</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">Inicio</a></li>
+        <li><a href="/modulo/1" class="{% if request.path.startswith('/modulo/1') %}active{% endif %}">Módulo 1: Detención</a></li>
+        <li><a href="/modulo/2" class="{% if request.path.startswith('/modulo/2') %}active{% endif %}">Módulo 2: Deterioro</a></li>
+        <li><a href="/teoria-errores" class="{% if request.path == '/teoria-errores' %}active{% endif %}">Teoría de Errores</a></li>
+        <li><a href="/historial" class="{% if request.path == '/historial' %}active{% endif %}">Historial BD</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- Contenido Dinámico -->
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Pie de Página -->
+  <footer>
+    <div class="container" style="margin: 0 auto;">
+      <p><b>SIMTELE-RISK</b> · Desafío Integrador Final de Métodos Numéricos, Ingeniería de Sistemas y Desarrollo de Software.</p>
+      <p style="margin-top: 4px;">Caso académico inspirado en Mi Teleférico (La Paz – El Alto). Datos sintéticos y parámetros supuestos de ingeniería (EN 12929-1 / EN 12927).</p>
+    </div>
+  </footer>
+
+  <!-- Script global para Tabs -->
+  <script>
+    function openTab(evt, tabName) {
+      const container = evt.currentTarget.closest('.card') || document;
+      const tabPanes = container.querySelectorAll('.tab-pane');
+      const tabBtns = container.querySelectorAll('.tab-btn');
+      tabPanes.forEach(p => p.classList.remove('active'));
+      tabBtns.forEach(b => b.classList.remove('active'));
+      const target = document.getElementById(tabName);
+      if (target) target.classList.add('active');
+      evt.currentTarget.classList.add('active');
+    }
+  </script>
+  
+  {% block scripts %}{% endblock %}
+</body>
+</html>
