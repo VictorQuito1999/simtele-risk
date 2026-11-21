@@ -26,6 +26,26 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
 
+class VercelPathFixMiddleware:
+    """Middleware WSGI para corregir PATH_INFO cuando Vercel reescribe URLs hacia la función Serverless."""
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        orig_uri = (
+            environ.get('HTTP_X_FORWARDED_URI')
+            or environ.get('HTTP_X_MATCHED_PATH')
+            or environ.get('HTTP_X_ORIGINAL_URL')
+        )
+        if orig_uri:
+            environ['PATH_INFO'] = orig_uri.split('?')[0]
+        elif environ.get('PATH_INFO', '').startswith('/src/app.py'):
+            clean_path = environ['PATH_INFO'][len('/src/app.py'):]
+            environ['PATH_INFO'] = clean_path if clean_path else '/'
+        return self.wsgi_app(environ, start_response)
+
+app.wsgi_app = VercelPathFixMiddleware(app.wsgi_app)
+
 def db():
     return get_db()
 
@@ -73,6 +93,7 @@ CASOS_INFO = {
 # ---------- Rutas Principales ----------
 
 @app.route('/')
+@app.route('/src/app.py')
 def inicio():
     return render_template('index.html')
 
