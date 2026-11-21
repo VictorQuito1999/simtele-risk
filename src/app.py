@@ -4,7 +4,13 @@ Cubre los 4 Módulos Obligatorios con Escenarios NORMAL, ESTRÉS y MAL CONDICION
 Flask + SQLite + NumPy + Chart.js.
 Ejecutar: python src/app.py
 """
-import json, time, sqlite3, os
+import json, time, sqlite3, os, sys
+
+# Asegurar que la carpeta 'src' esté en sys.path para importaciones en Vercel y local
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
+
 from flask import Flask, render_template, request, redirect, url_for, abort
 import numpy as np
 
@@ -13,22 +19,25 @@ import modulo1
 import modulo2
 import modulo3
 import modulo4
+from db_adapter import get_db, DB_PATH
 
-DB = os.path.join(os.path.dirname(__file__), '..', 'simtele.db')
+DB = DB_PATH
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
 
 def db():
-    c = sqlite3.connect(DB)
-    c.row_factory = sqlite3.Row
-    c.execute('PRAGMA foreign_keys=ON')
-    return c
+    return get_db()
 
 def init():
-    with db() as c:
-        schema_sql = open(os.path.join(os.path.dirname(__file__), '..', 'sql', 'schema.sql')).read()
-        c.executescript(schema_sql)
+    try:
+        schema_file = os.path.join(os.path.dirname(__file__), '..', 'sql', 'schema.sql')
+        if os.path.exists(schema_file):
+            with db() as c:
+                schema_sql = open(schema_file, encoding='utf-8').read()
+                c.executescript(schema_sql)
+    except Exception as e:
+        print(f"Init DB notice: {e}")
 
 CASOS_INFO = {
     1: {
