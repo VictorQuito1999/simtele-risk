@@ -4,7 +4,7 @@ Cubre los 4 Módulos Obligatorios con Escenarios NORMAL, ESTRÉS y MAL CONDICION
 Flask + SQLite + NumPy + Chart.js.
 Ejecutar: python src/app.py
 """
-import json, time, sqlite3, os, sys
+import json, time, sqlite3, os, sys, urllib.parse
 
 # Asegurar que la carpeta 'src' esté en sys.path para importaciones en Vercel y local
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,21 +27,34 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
 
 class VercelPathFixMiddleware:
-    """Middleware WSGI para corregir PATH_INFO cuando Vercel reescribe URLs hacia la función Serverless."""
+    """Middleware WSGI para corregir PATH_INFO en Vercel Serverless Functions."""
     def __init__(self, wsgi_app):
         self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
-        orig_uri = (
-            environ.get('HTTP_X_FORWARDED_URI')
-            or environ.get('HTTP_X_MATCHED_PATH')
-            or environ.get('HTTP_X_ORIGINAL_URL')
-        )
-        if orig_uri:
-            environ['PATH_INFO'] = orig_uri.split('?')[0]
-        elif environ.get('PATH_INFO', '').startswith('/src/app.py'):
-            clean_path = environ['PATH_INFO'][len('/src/app.py'):]
-            environ['PATH_INFO'] = clean_path if clean_path else '/'
+        query_string = environ.get('QUERY_STRING', '')
+        if '__path__=' in query_string:
+            params = urllib.parse.parse_qs(query_string)
+            if '__path__' in params and params['__path__']:
+                target = params['__path__'][0]
+                if not target.startswith('/'):
+                    target = '/' + target
+                while target.startswith('//'):
+                    target = target[1:]
+                environ['PATH_INFO'] = target
+                clean_queries = [p for p in query_string.split('&') if not p.startswith('__path__=')]
+                environ['QUERY_STRING'] = '&'.join(clean_queries)
+                return self.wsgi_app(environ, start_response)
+
+        for header_key in ('HTTP_X_FORWARDED_URI', 'HTTP_X_ORIGINAL_URL', 'HTTP_X_INVOKE_PATH'):
+            val = environ.get(header_key)
+            if val and not val.startswith('/src/app.py'):
+                environ['PATH_INFO'] = val.split('?')[0]
+                return self.wsgi_app(environ, start_response)
+
+        if environ.get('PATH_INFO', '') in ('/src/app.py', ''):
+            environ['PATH_INFO'] = '/'
+
         return self.wsgi_app(environ, start_response)
 
 app.wsgi_app = VercelPathFixMiddleware(app.wsgi_app)

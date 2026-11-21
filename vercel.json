@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/src/app.py"
+      "destination": "/src/app.py?__path__=/$1"
     }
   ]
 }
