@@ -287,14 +287,14 @@
     <div style="margin-bottom: 1.5rem;">
       <b style="font-size: 0.9rem; color: var(--text); display: block; margin-bottom: 0.5rem;">Escenarios Normalizados:</b>
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-        <a href="/correr/{{ caso.id }}/NORMAL" class="btn btn-outline" style="border-color: #16a34a; color: #16a34a;">
-          🟢 Ejecutar Escenario NORMAL
+        <a href="/correr/{{ caso.id }}/NORMAL" class="btn btn-outline btn-run" style="border-color: #16a34a; color: #16a34a;">
+          <span>🟢 Ejecutar Escenario NORMAL</span>
         </a>
-        <a href="/correr/{{ caso.id }}/ESTRES" class="btn btn-outline" style="border-color: #ca8a04; color: #ca8a04;">
-          🟡 Ejecutar Escenario ESTRÉS
+        <a href="/correr/{{ caso.id }}/ESTRES" class="btn btn-outline btn-run" style="border-color: #ca8a04; color: #ca8a04;">
+          <span>🟡 Ejecutar Escenario ESTRÉS</span>
         </a>
-        <a href="/correr/{{ caso.id }}/MAL_CONDICIONADO" class="btn btn-outline" style="border-color: #dc2626; color: #dc2626;">
-          🔴 Ejecutar Escenario MAL CONDICIONADO
+        <a href="/correr/{{ caso.id }}/MAL_CONDICIONADO" class="btn btn-outline btn-run" style="border-color: #dc2626; color: #dc2626;">
+          <span>🔴 Ejecutar Escenario MAL CONDICIONADO</span>
         </a>
       </div>
     </div>
@@ -304,7 +304,7 @@
       <h4 style="font-size: 1rem; color: var(--primary); margin-bottom: 1rem;">Formulario de Simulación Personalizada</h4>
       
       {% if caso.id == 2 %}
-      <form action="/simular-custom/2" method="POST">
+      <form action="/simular-custom/2" method="POST" class="form-simulacion">
         <div class="grid-2">
           <div>
             <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Deterioro Inicial ($D_0$):</label>
@@ -328,11 +328,11 @@
           </div>
         </div>
         <div style="margin-top: 1.25rem;">
-          <button type="submit" class="btn">🚀 Ejecutar Cálculo y Guardar en Historial</button>
+          <button type="submit" class="btn btn-run">🚀 Ejecutar Cálculo y Guardar en Historial</button>
         </div>
       </form>
       {% elif caso.id == 1 %}
-      <form action="/simular-custom/1" method="POST">
+      <form action="/simular-custom/1" method="POST" class="form-simulacion">
         <div class="grid-2">
           <div>
             <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Velocidad Inicial ($v_0$ m/s):</label>
@@ -356,11 +356,11 @@
           </div>
         </div>
         <div style="margin-top: 1.25rem;">
-          <button type="submit" class="btn">🚀 Ejecutar Simulación EDO (RK2/RK4)</button>
+          <button type="submit" class="btn btn-run">🚀 Ejecutar Simulación EDO (RK2/RK4)</button>
         </div>
       </form>
       {% elif caso.id == 3 %}
-      <form action="/simular-custom/3" method="POST">
+      <form action="/simular-custom/3" method="POST" class="form-simulacion">
         <div class="grid-2">
           <div>
             <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Masa Total ($m$ kg):</label>
@@ -389,11 +389,11 @@
           </div>
         </div>
         <div style="margin-top: 1.25rem;">
-          <button type="submit" class="btn">🚀 Ejecutar Simulación Dinámica y Energía (RK2 / RK4)</button>
+          <button type="submit" class="btn btn-run">🚀 Ejecutar Simulación Dinámica y Energía (RK2 / RK4)</button>
         </div>
       </form>
       {% elif caso.id == 4 %}
-      <form action="/simular-custom/4" method="POST">
+      <form action="/simular-custom/4" method="POST" class="form-simulacion">
         <div class="grid-2">
           <div>
             <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Número de Nodos Muestreados ($n$):</label>
@@ -415,7 +415,7 @@
           </div>
         </div>
         <div style="margin-top: 1.25rem;">
-          <button type="submit" class="btn">🚀 Ejecutar Reconstrucción (Lagrange vs Newton vs Splines)</button>
+          <button type="submit" class="btn btn-run">🚀 Ejecutar Reconstrucción (Lagrange vs Newton vs Splines)</button>
         </div>
       </form>
       {% endif %}
