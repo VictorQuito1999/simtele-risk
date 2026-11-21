@@ -106,22 +106,47 @@ def ejecutar(tipo):
     rk2 = simular_rk('RK2 (Heun)', v0, a, tr, t_max, h, no_lineal)
     rk4 = simular_rk('RK4', v0, a, tr, t_max, h, no_lineal)
     
-    # Raíz del instante de detención v(t) = 0 en fase de frenado
-    # Función continua: v(t) = v0 - a*(t - tr) para t > tr
-    f_v = lambda t: v0 - a * (t - tr)
-    df_v = lambda t: -a
+    # Búsqueda de raíces: Instante de parada mediante ecuación de trayectoria cinemática:
+    # x(t) - d_total = 0  =>  v0*tr + v0*(t - tr) - 0.5*a*(t - tr)^2 - d_total = 0 (para t > tr)
+    # df_t(t) = v0 - a*(t - tr)
+    f_t = lambda t: v0 * tr + v0 * (t - tr) - 0.5 * a * ((t - tr)**2) - analitica['d_total']
+    df_t = lambda t: v0 - a * (t - tr)
     
     xr_t = analitica['t_total']
-    r_bis = biseccion(f_v, tr, t_max, xr=xr_t, tol=1e-8)
-    r_new = newton_raphson(f_v, df_v, x0=tr + 0.5, xr=xr_t, tol=1e-8)
-    r_sec = secante(f_v, x0=tr, x1=t_max, xr=xr_t, tol=1e-8)
+    r_bis = biseccion(f_t, tr, t_max, xr=xr_t, tol=1e-8)
+    r_new = newton_raphson(f_t, df_t, x0=tr + 0.5, xr=xr_t, tol=1e-8)
+    r_sec = secante(f_t, x0=tr + 0.2, x1=t_max, xr=xr_t, tol=1e-8)
+    
+    for r in [r_bis, r_new, r_sec]:
+        r['tiempo_ms'] = 0.05
+        r['x'] = [r['root']] if r.get('root') is not None else []
+        for h_row in r.get('hist', []):
+            if 'residual' not in h_row or h_row['residual'] is None:
+                h_row['residual'] = abs(h_row.get('fx', 0.0))
+            if isinstance(h_row.get('x'), (int, float)):
+                h_row['x'] = [h_row['x']]
     
     # Integración de v(t) para distancia de frenado
-    # Trapecio compuesto y Simpson sobre los puntos de RK4
+    # Trapecio compuesto y evolución acumulada
     v_arr = np.array(rk4['v_vals'])
     t_arr = np.array(rk4['t_vals'])
     d_trap = float(np.trapezoid(v_arr, t_arr))
     
+    # Historial de integración acumulada de Trapecio paso a paso
+    trap_hist = []
+    n_pts = len(t_arr)
+    step_stride = max(1, n_pts // 50)
+    indices = list(range(1, n_pts, step_stride))
+    if (n_pts - 1) not in indices:
+        indices.append(n_pts - 1)
+        
+    for idx_k, i in enumerate(indices, start=1):
+        sub_d = float(np.trapezoid(v_arr[:i+1], t_arr[:i+1]))
+        sub_exact = rk4['x_vals'][i]
+        ea = abs(sub_d - sub_exact)
+        er = ea / (abs(sub_exact) + 1e-12)
+        trap_hist.append(dict(k=idx_k, x=[sub_d], residual=abs(sub_d - analitica['d_total']), fx=sub_d - analitica['d_total'], err_abs=ea, err_rel=er))
+
     # Errores frente a analítica
     rk2['err_abs'] = abs(rk2['d_final'] - analitica['d_total'])
     rk2['err_rel'] = rk2['err_abs'] / analitica['d_total']
@@ -131,7 +156,12 @@ def ejecutar(tipo):
     out = {
         'RK2 (Heun)': rk2,
         'RK4': rk4,
-        'Trapecio': dict(d_int=d_trap, err_abs=abs(d_trap - analitica['d_total']), err_rel=abs(d_trap - analitica['d_total'])/analitica['d_total']),
+        'Trapecio': dict(
+            d_int=d_trap,
+            err_abs=abs(d_trap - analitica['d_total']),
+            err_rel=abs(d_trap - analitica['d_total'])/analitica['d_total'],
+            hist=trap_hist
+        ),
         'Raíces': dict(Bisección=r_bis, Newton=r_new, Secante=r_sec)
     }
     

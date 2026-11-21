@@ -387,14 +387,14 @@
   <div class="card" style="margin-bottom: 0; border-radius: 14px;">
     <div class="card-header" style="border-bottom: 1px solid #f1f5f9;">
       <div>
-        <h3 class="card-title" style="font-size: 1.05rem;">
+        <h3 class="card-title" style="font-size: 1.15rem;">
           Gráfico 1: Fenómeno Físico y Modelo Temporal
         </h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted);">Curva dinámica vs Umbrales de Seguridad</span>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Curva dinámica vs Umbrales de Seguridad</span>
       </div>
       <span class="badge badge-blue">Solución Física</span>
     </div>
-    <div style="position: relative; height: 280px; width: 100%;">
+    <div style="position: relative; height: 450px; min-height: 450px; width: 100%;">
       <canvas id="chartFisico"></canvas>
     </div>
   </div>
@@ -403,14 +403,14 @@
   <div class="card" style="margin-bottom: 0; border-radius: 14px;">
     <div class="card-header" style="border-bottom: 1px solid #f1f5f9;">
       <div>
-        <h3 class="card-title" style="font-size: 1.05rem;">
+        <h3 class="card-title" style="font-size: 1.15rem;">
           Gráfico 2: Curvas de Convergencia Numérica
         </h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted);">Evolución del Error Relativo en Escala Logarítmica</span>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Evolución del Error Relativo en Escala Logarítmica</span>
       </div>
       <span class="badge badge-blue">Error Log₁₀ vs k</span>
     </div>
-    <div style="position: relative; height: 280px; width: 100%;">
+    <div style="position: relative; height: 450px; min-height: 450px; width: 100%;">
       <canvas id="chartError"></canvas>
     </div>
   </div>
@@ -488,11 +488,11 @@
             {% endif %}
           </td>
           <td style="color: var(--text-muted); font-size: 0.85rem;">
-            {{ '%.2e' % m.res if m.res is not none else '∞' }}
+            {{ '%.2e' % m.res if (m.res is not none and m.res > 0) else '0.00e+00' }}
           </td>
           <td>
             <b style="color: {% if m.er is not none and m.er < 1e-4 %}#16a34a{% elif m.er is not none and m.er < 0.05 %}#ca8a04{% else %}#dc2626{% endif %}; font-size: 0.9rem;">
-              {{ '%.2e' % m.er if m.er is not none else '∞' }}
+              {{ '%.2e' % m.er if m.er is not none else '0.00e+00' }}
             </b>
           </td>
         </tr>
@@ -572,7 +572,7 @@
               <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #0f172a;">{{ it.aprox_str }}</code>
             </td>
             <td style="color: var(--text-muted); font-size: 0.85rem;">
-              {{ '%.2e' % it.residual if it.residual is not none else '∞' }}
+              {{ '%.2e' % it.residual if (it.residual is not none and it.residual > 0) else '0.00e+00' }}
             </td>
             <td style="color: var(--text-muted); font-size: 0.85rem;">
               {{ '%.2e' % it.error_abs if it.error_abs is not none else '-' }}
@@ -708,17 +708,18 @@
           position: 'top',
           align: 'end',
           labels: {
-            boxWidth: 10,
-            boxHeight: 10,
+            boxWidth: 12,
+            boxHeight: 12,
             usePointStyle: true,
-            font: { size: 11, family: 'system-ui' }
+            font: { size: 12, family: 'system-ui', weight: '600' },
+            padding: 16
           }
         },
         tooltip: {
           backgroundColor: '#0f172a',
-          titleFont: { size: 12, weight: 'bold' },
+          titleFont: { size: 13, weight: 'bold' },
           bodyFont: { size: 12 },
-          padding: 10,
+          padding: 12,
           cornerRadius: 8,
           displayColors: true
         }
@@ -726,13 +727,13 @@
       scales: {
         x: {
           grid: { color: '#f1f5f9' },
-          ticks: { font: { size: 11 } },
-          title: { display: true, text: chartFisicoData.x_label || 'Eje X', font: { weight: 'bold', size: 11 } }
+          ticks: { font: { size: 12 } },
+          title: { display: true, text: chartFisicoData.x_label || 'Eje X', font: { weight: 'bold', size: 12 } }
         },
         y: {
           grid: { color: '#f1f5f9' },
-          ticks: { font: { size: 11 } },
-          title: { display: true, text: chartFisicoData.y_label || 'Eje Y', font: { weight: 'bold', size: 11 } }
+          ticks: { font: { size: 12 } },
+          title: { display: true, text: chartFisicoData.y_label || 'Eje Y', font: { weight: 'bold', size: 12 } }
         }
       }
     }
@@ -742,8 +743,8 @@
   if (seriesErrorData.datasets) {
     seriesErrorData.datasets.forEach(ds => {
       ds.tension = 0.25;
-      ds.pointRadius = 3;
-      ds.pointHoverRadius = 6;
+      ds.pointRadius = 4;
+      ds.pointHoverRadius = 7;
     });
   }
 
@@ -766,32 +767,49 @@
           position: 'top',
           align: 'end',
           labels: {
-            boxWidth: 10,
-            boxHeight: 10,
+            boxWidth: 12,
+            boxHeight: 12,
             usePointStyle: true,
-            font: { size: 11, family: 'system-ui' }
+            font: { size: 12, family: 'system-ui', weight: '600' },
+            padding: 16
           }
         },
         tooltip: {
           backgroundColor: '#0f172a',
-          titleFont: { size: 12, weight: 'bold' },
+          titleFont: { size: 13, weight: 'bold' },
           bodyFont: { size: 12 },
-          padding: 10,
+          padding: 12,
           cornerRadius: 8,
-          displayColors: true
+          displayColors: true,
+          callbacks: {
+            label: function(context) {
+              const val = context.parsed.y;
+              return context.dataset.label + ': ' + (val !== null ? val.toExponential(2) : '-');
+            }
+          }
         }
       },
       scales: {
         x: {
           grid: { color: '#f1f5f9' },
-          ticks: { font: { size: 11 } },
-          title: { display: true, text: 'Número de Iteración / Paso (k)', font: { weight: 'bold', size: 11 } }
+          ticks: { font: { size: 12 } },
+          title: { display: true, text: 'Número de Iteración / Paso (k)', font: { weight: 'bold', size: 12 } }
         },
         y: {
           type: 'logarithmic',
           grid: { color: '#f1f5f9' },
-          ticks: { font: { size: 11 } },
-          title: { display: true, text: 'Error Relativo (Escala Log₁₀)', font: { weight: 'bold', size: 11 } },
+          ticks: {
+            font: { size: 12 },
+            callback: function(value, index, ticks) {
+              if (value === 0) return '0';
+              const exp = Math.round(Math.log10(value));
+              if (Math.abs(value - Math.pow(10, exp)) / Math.pow(10, exp) < 1e-4) {
+                return '1e' + (exp >= 0 ? '+' + exp : exp);
+              }
+              return null;
+            }
+          },
+          title: { display: true, text: 'Error Relativo (Escala Log₁₀)', font: { weight: 'bold', size: 12 } },
           min: 1e-17,
           max: 10
         }

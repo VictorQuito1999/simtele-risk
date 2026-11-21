@@ -305,7 +305,7 @@
       
       {% if caso.id == 2 %}
       <form action="/simular-custom/2" method="POST" class="form-simulacion">
-        <div class="grid-2">
+        <div class="grid-4">
           <div>
             <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Deterioro Inicial ($D_0$):</label>
             <input type="number" step="0.01" min="0" max="0.99" name="D0" value="0.10" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
@@ -333,7 +333,7 @@
       </form>
       {% elif caso.id == 1 %}
       <form action="/simular-custom/1" method="POST" class="form-simulacion">
-        <div class="grid-2">
+        <div class="grid-4">
           <div>
             <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Velocidad Inicial ($v_0$ m/s):</label>
             <input type="number" step="0.1" min="1" max="10" name="v0" value="5.0" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
@@ -361,7 +361,7 @@
       </form>
       {% elif caso.id == 3 %}
       <form action="/simular-custom/3" method="POST" class="form-simulacion">
-        <div class="grid-2">
+        <div class="grid-4" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
           <div>
             <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Masa Total ($m$ kg):</label>
             <input type="number" step="50" min="500" max="10000" name="m" value="3000" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
@@ -378,7 +378,7 @@
             <small style="color: var(--text-muted);">Rigidez elástica del vano de cable</small>
           </div>
           <div>
-            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Fuerza Ráfaga de Viento ($F_0$ N):</label>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Fuerza Ráfaga ($F_0$ N):</label>
             <input type="number" step="50" min="0" max="5000" name="F0" value="800" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">
             <small style="color: var(--text-muted);">Amplitud de fuerza periódica lateral</small>
           </div>
@@ -394,7 +394,7 @@
       </form>
       {% elif caso.id == 4 %}
       <form action="/simular-custom/4" method="POST" class="form-simulacion">
-        <div class="grid-2">
+        <div class="grid-3">
           <div>
             <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 4px;">Número de Nodos Muestreados ($n$):</label>
             <input type="number" step="1" min="4" max="25" name="n_nodos" value="10" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px;">

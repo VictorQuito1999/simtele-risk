@@ -78,60 +78,74 @@ METODOS = {'Jacobi': jacobi, 'Gauss-Seidel': gauss_seidel, 'LU': lu, 'Gradiente 
 def biseccion(f, a, b, xr=None, tol=1e-8, max_iter=100):
     fa, fb = f(a), f(b)
     if fa * fb > 0:
-        return dict(root=None, iters=0, converged=False, error="Intervalo no encierra raíz [f(a)*f(b) > 0]", hist=[])
+        return dict(root=None, iters=0, converged=False, error="Intervalo no encierra raíz [f(a)*f(b) > 0]", hist=[], x=[])
     h = []; c_old = a
     for k in range(1, max_iter + 1):
         c = (a + b) / 2.0
         fc = f(c)
         ea = abs(c - xr) if xr is not None else abs(c - c_old)
         er = (ea / abs(xr) if abs(xr) > 1e-300 else float('nan')) if xr is not None else (ea / abs(c) if abs(c) > 1e-300 else float('nan'))
-        h.append(dict(k=k, x=float(c), fx=float(fc), err_abs=float(ea), err_rel=float(er)))
+        h.append(dict(k=k, x=[float(c)], residual=abs(float(fc)), fx=float(fc), err_abs=float(ea), err_rel=float(er)))
         if abs(fc) < tol or (b - a) / 2.0 < tol:
-            return dict(root=float(c), iters=k, converged=True, hist=h)
+            return dict(root=float(c), iters=k, converged=True, hist=h, x=[float(c)])
         if fa * fc < 0:
             b = c; fb = fc
         else:
             a = c; fa = fc
         c_old = c
-    return dict(root=float(c), iters=max_iter, converged=False, hist=h)
+    return dict(root=float(c), iters=max_iter, converged=False, hist=h, x=[float(c)])
 
 def newton_raphson(f, df, x0, xr=None, tol=1e-8, max_iter=100):
     x = float(x0); h = []
+    # Registrar aproximación inicial k=0
+    fx0 = f(x)
+    ea0 = abs(x - xr) if xr is not None else float('nan')
+    er0 = (ea0 / abs(xr)) if (xr is not None and abs(xr) > 1e-300) else float('nan')
+    h.append(dict(k=0, x=[float(x)], residual=abs(float(fx0)), fx=float(fx0), err_abs=float(ea0), err_rel=float(er0)))
+    
     for k in range(1, max_iter + 1):
         fx = f(x); dfx = df(x)
         if abs(dfx) < 1e-15:
             ea = abs(x - xr) if xr is not None else float('nan')
             er = (ea / abs(xr) if xr is not None and abs(xr) > 1e-300 else float('nan'))
-            h.append(dict(k=k, x=float(x), fx=float(fx), err_abs=float(ea), err_rel=float(er)))
-            return dict(root=float(x), iters=k, converged=False, error="Derivada nula o cuasi-nula", hist=h)
+            return dict(root=float(x), iters=k, converged=False, error="Derivada nula o cuasi-nula", hist=h, x=[float(x)])
         x_next = x - fx / dfx
         ea = abs(x_next - xr) if xr is not None else abs(x_next - x)
         er = (ea / abs(xr) if abs(xr) > 1e-300 else float('nan')) if xr is not None else (ea / abs(x_next) if abs(x_next) > 1e-300 else float('nan'))
         fx_next = f(x_next)
-        h.append(dict(k=k, x=float(x_next), fx=float(fx_next), err_abs=float(ea), err_rel=float(er)))
+        h.append(dict(k=k, x=[float(x_next)], residual=abs(float(fx_next)), fx=float(fx_next), err_abs=float(ea), err_rel=float(er)))
         if abs(fx_next) < tol or abs(x_next - x) < tol:
-            return dict(root=float(x_next), iters=k, converged=True, hist=h)
+            return dict(root=float(x_next), iters=k, converged=True, hist=h, x=[float(x_next)])
         x = x_next
-    return dict(root=float(x), iters=max_iter, converged=False, hist=h)
+    return dict(root=float(x), iters=max_iter, converged=False, hist=h, x=[float(x)])
 
 def secante(f, x0, x1, xr=None, tol=1e-8, max_iter=100):
     x_prev, x_curr = float(x0), float(x1)
     f_prev, f_curr = f(x_prev), f(x_curr)
     h = []
-    for k in range(1, max_iter + 1):
+    # Registrar puntos iniciales k=0 y k=1
+    ea0 = abs(x_prev - xr) if xr is not None else float('nan')
+    er0 = (ea0 / abs(xr)) if (xr is not None and abs(xr) > 1e-300) else float('nan')
+    h.append(dict(k=0, x=[float(x_prev)], residual=abs(float(f_prev)), fx=float(f_prev), err_abs=float(ea0), err_rel=float(er0)))
+    
+    ea1 = abs(x_curr - xr) if xr is not None else abs(x_curr - x_prev)
+    er1 = (ea1 / abs(xr)) if (xr is not None and abs(xr) > 1e-300) else float('nan')
+    h.append(dict(k=1, x=[float(x_curr)], residual=abs(float(f_curr)), fx=float(f_curr), err_abs=float(ea1), err_rel=float(er1)))
+    
+    for k in range(2, max_iter + 2):
         denom = f_curr - f_prev
         if abs(denom) < 1e-15:
-            return dict(root=float(x_curr), iters=k, converged=False, error="División por cero en secante", hist=h)
+            return dict(root=float(x_curr), iters=k-1, converged=False, error="División por cero en secante", hist=h, x=[float(x_curr)])
         x_next = x_curr - f_curr * (x_curr - x_prev) / denom
         ea = abs(x_next - xr) if xr is not None else abs(x_next - x_curr)
         er = (ea / abs(xr) if abs(xr) > 1e-300 else float('nan')) if xr is not None else (ea / abs(x_next) if abs(x_next) > 1e-300 else float('nan'))
         fx_next = f(x_next)
-        h.append(dict(k=k, x=float(x_next), fx=float(fx_next), err_abs=float(ea), err_rel=float(er)))
+        h.append(dict(k=k, x=[float(x_next)], residual=abs(float(fx_next)), fx=float(fx_next), err_abs=float(ea), err_rel=float(er)))
         if abs(fx_next) < tol or abs(x_next - x_curr) < tol:
-            return dict(root=float(x_next), iters=k, converged=True, hist=h)
+            return dict(root=float(x_next), iters=k, converged=True, hist=h, x=[float(x_next)])
         x_prev, x_curr = x_curr, x_next
         f_prev, f_curr = f_curr, fx_next
-    return dict(root=float(x_curr), iters=max_iter, converged=False, hist=h)
+    return dict(root=float(x_curr), iters=max_iter, converged=False, hist=h, x=[float(x_curr)])
 
 METODOS_RAICES = {'Bisección': biseccion, 'Newton-Raphson': newton_raphson, 'Secante': secante}
 

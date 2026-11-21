@@ -5,16 +5,19 @@ __pycache__/
 *.so
 .pytest_cache/
 
-# Entorno virtual
+# Entorno virtual y secretos
 venv/
 .venv/
 env/
+.env
+.env.local
 
 # Archivos de respaldo y temporales
 *.tmp
 *.bak
 *.swp
 .DS_Store
+dump_simtele.sql
 
 # Base de datos de prueba
 src/test_simtele.db

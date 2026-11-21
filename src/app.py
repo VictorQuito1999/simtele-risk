@@ -120,6 +120,37 @@ def modulo(cid):
         abort(404)
     return render_template('modulo.html', caso=CASOS_INFO[cid])
 
+# ---------- Funciones Auxiliares de Formato ----------
+
+def _format_x_json(h):
+    val = h.get('x')
+    if val is None:
+        return json.dumps([])
+    if isinstance(val, (list, tuple)):
+        return json.dumps([float(v) for v in val])
+    if isinstance(val, (int, float, np.number)):
+        return json.dumps([float(val)])
+    try:
+        arr = np.asarray(val).tolist()
+        if isinstance(arr, list):
+            return json.dumps(arr)
+        return json.dumps([arr])
+    except:
+        return json.dumps([])
+
+def _format_residual(h):
+    r = h.get('residual')
+    if r is None:
+        r = h.get('fx')
+    if r is not None:
+        try:
+            r_val = float(abs(r))
+            if np.isfinite(r_val):
+                return r_val
+        except:
+            pass
+    return None
+
 # ---------- Ejecución de Escenarios Predefinidos (Los 4 Módulos) ----------
 
 @app.route('/correr/<int:cid>/<tipo>')
@@ -149,7 +180,13 @@ def correr(cid, tipo):
             r_res['x'] = [r_res['root']]
             out[f"Raíz detención ({r_name})"] = r_res
         # Integración Trapecio
-        out['Integración Trapecio (v(t))'] = dict(converged=True, iters=len(r_sim['t_vals']), tiempo_ms=0.2, x=[out_m1['Trapecio']['d_int']], hist=[dict(k=1, x=[out_m1['Trapecio']['d_int']], residual=0, err_abs=out_m1['Trapecio']['err_abs'], err_rel=out_m1['Trapecio']['err_rel'])])
+        out['Integración Trapecio (v(t))'] = dict(
+            converged=True,
+            iters=len(out_m1['Trapecio']['hist']),
+            tiempo_ms=0.2,
+            x=[out_m1['Trapecio']['d_int']],
+            hist=out_m1['Trapecio']['hist']
+        )
 
     elif cid == 2:
         e, out = modulo2.ejecutar(tipo)
@@ -228,8 +265,8 @@ def correr(cid, tipo):
             hist_rows = r_data.get('hist', [])
             c.executemany(
                 'INSERT INTO iteracion_resultado(ejecucion_id,numero,aproximacion_json,residual,error_abs,error_rel) VALUES(?,?,?,?,?,?)',
-                [(ex, h['k'], json.dumps(np.asarray(h.get('x', [])).tolist()),
-                  None if (h.get('residual') is None or not np.isfinite(h.get('residual'))) else float(h.get('residual')),
+                [(ex, h['k'], _format_x_json(h),
+                  _format_residual(h),
                   None if (h.get('err_abs') is None or not np.isfinite(h.get('err_abs'))) else float(h.get('err_abs')),
                   None if (h.get('err_rel') is None or not np.isfinite(h.get('err_rel'))) else float(h.get('err_rel')))
                  for h in hist_rows]
@@ -258,15 +295,57 @@ def simular_custom(cid):
         t_max = max(analitica['t_total'] * 1.5, 30.0)
         rk2 = modulo1.simular_rk('RK2 (Heun)', v0, a, tr, t_max, h)
         rk4 = modulo1.simular_rk('RK4', v0, a, tr, t_max, h)
-        f_v = lambda t: v0 - a * (t - tr)
-        df_v = lambda t: -a
-        r_new = modulo2.newton_raphson(f_v, df_v, x0=tr + 0.5, xr=analitica['t_total'])
-        r_new['x'] = [r_new['root']]
+        
+        # Búsqueda de raíces sobre ecuación cinemática x(t) = d_total
+        f_t = lambda t: v0 * tr + v0 * (t - tr) - 0.5 * a * ((t - tr)**2) - analitica['d_total']
+        df_t = lambda t: v0 - a * (t - tr)
+        xr_t = analitica['t_total']
+        r_bis = modulo1.biseccion(f_t, tr, t_max, xr=xr_t, tol=1e-8)
+        r_new = modulo1.newton_raphson(f_t, df_t, x0=tr + 0.5, xr=xr_t, tol=1e-8)
+        r_sec = modulo1.secante(f_t, x0=tr + 0.2, x1=t_max, xr=xr_t, tol=1e-8)
+        
+        for r in [r_bis, r_new, r_sec]:
+            r['tiempo_ms'] = 0.05
+            r['x'] = [r['root']] if r.get('root') is not None else []
+            for h_row in r.get('hist', []):
+                if 'residual' not in h_row or h_row['residual'] is None:
+                    h_row['residual'] = abs(h_row.get('fx', 0.0))
+                if isinstance(h_row.get('x'), (int, float)):
+                    h_row['x'] = [h_row['x']]
+                    
+        # Integración Trapecio acumulada
+        v_arr = np.array(rk4['v_vals'])
+        t_arr = np.array(rk4['t_vals'])
+        d_trap = float(np.trapezoid(v_arr, t_arr))
+        n_pts = len(t_arr)
+        step_stride = max(1, n_pts // 50)
+        indices = list(range(1, n_pts, step_stride))
+        if (n_pts - 1) not in indices:
+            indices.append(n_pts - 1)
+        trap_hist = []
+        for idx_k, i in enumerate(indices, start=1):
+            sub_d = float(np.trapezoid(v_arr[:i+1], t_arr[:i+1]))
+            sub_exact = rk4['x_vals'][i]
+            ea = abs(sub_d - sub_exact)
+            er = ea / (abs(sub_exact) + 1e-12)
+            trap_hist.append(dict(k=idx_k, x=[sub_d], residual=abs(sub_d - analitica['d_total']), fx=sub_d - analitica['d_total'], err_abs=ea, err_rel=er))
+
         params = dict(caso_id=cid, v0=v0, a=a, tr=tr, L=L, h=h, d_total=analitica['d_total'], t_total=analitica['t_total'])
         out = {
-            'RK2 (Heun)': dict(converged=True, iters=rk2['pasos'], tiempo_ms=rk2['tiempo_ms'], x=[rk2['d_final']], hist=[]),
-            'RK4': dict(converged=True, iters=rk4['pasos'], tiempo_ms=rk4['tiempo_ms'], x=[rk4['d_final']], hist=[]),
-            'Raíz detención (Newton)': r_new
+            'RK2 (Heun)': dict(
+                converged=True, iters=rk2['pasos'], tiempo_ms=rk2['tiempo_ms'], x=[rk2['d_final']],
+                hist=[dict(k=i, x=[rk2['x_vals'][i]], residual=rk2['v_vals'][i], err_abs=abs(rk2['x_vals'][i]-analitica['d_total']), err_rel=abs(rk2['x_vals'][i]-analitica['d_total'])/analitica['d_total']) for i in range(min(50, len(rk2['t_vals'])))]
+            ),
+            'RK4': dict(
+                converged=True, iters=rk4['pasos'], tiempo_ms=rk4['tiempo_ms'], x=[rk4['d_final']],
+                hist=[dict(k=i, x=[rk4['x_vals'][i]], residual=rk4['v_vals'][i], err_abs=abs(rk4['x_vals'][i]-analitica['d_total']), err_rel=abs(rk4['x_vals'][i]-analitica['d_total'])/analitica['d_total']) for i in range(min(50, len(rk4['t_vals'])))]
+            ),
+            'Raíz detención (Bisección)': r_bis,
+            'Raíz detención (Newton)': r_new,
+            'Raíz detención (Secante)': r_sec,
+            'Integración Trapecio (v(t))': dict(
+                converged=True, iters=len(trap_hist), tiempo_ms=0.2, x=[d_trap], hist=trap_hist
+            )
         }
 
     elif cid == 2:
@@ -409,8 +488,8 @@ def simular_custom(cid):
             hist_rows = r_data.get('hist', [])
             c.executemany(
                 'INSERT INTO iteracion_resultado(ejecucion_id,numero,aproximacion_json,residual,error_abs,error_rel) VALUES(?,?,?,?,?,?)',
-                [(ex, h['k'], json.dumps(np.asarray(h.get('x', [])).tolist()),
-                  None if (h.get('residual') is None or not np.isfinite(h.get('residual'))) else float(h.get('residual')),
+                [(ex, h['k'], _format_x_json(h),
+                  _format_residual(h),
                   None if (h.get('err_abs') is None or not np.isfinite(h.get('err_abs'))) else float(h.get('err_abs')),
                   None if (h.get('err_rel') is None or not np.isfinite(h.get('err_rel'))) else float(h.get('err_rel')))
                  for h in hist_rows]
@@ -458,11 +537,13 @@ def ver_simulacion(sid):
             if ej['ult_aprox']:
                 try:
                     parsed = json.loads(ej['ult_aprox'])
-                    if isinstance(parsed, list):
+                    if isinstance(parsed, (int, float)):
+                        aprox_str = f"{float(parsed):.6f}"
+                    elif isinstance(parsed, list):
                         if len(parsed) == 1:
-                            aprox_str = f"{parsed[0]:.6f}"
+                            aprox_str = f"{float(parsed[0]):.6f}"
                         elif len(parsed) <= 4:
-                            aprox_str = "[" + ", ".join(f"{v:.4f}" for v in parsed) + "]"
+                            aprox_str = "[" + ", ".join(f"{float(v):.4f}" for v in parsed) + "]"
                         else:
                             aprox_str = f"Vector [{len(parsed)} elem]"
                     else:
@@ -474,10 +555,22 @@ def ver_simulacion(sid):
             for it in iter_rows:
                 it_dict = dict(it)
                 try:
-                    p_it = json.loads(it['aproximacion_json'])
-                    it_dict['aprox_str'] = f"{p_it[0]:.6f}" if len(p_it) == 1 else (f"[{p_it[0]:.2f}, ...]" if len(p_it)>1 else "-")
-                except:
-                    it_dict['aprox_str'] = "-"
+                    p_it = json.loads(it['aproximacion_json']) if it['aproximacion_json'] else []
+                    if isinstance(p_it, (int, float)):
+                        it_dict['aprox_str'] = f"{float(p_it):.6f}"
+                    elif isinstance(p_it, list):
+                        if len(p_it) == 1:
+                            it_dict['aprox_str'] = f"{float(p_it[0]):.6f}"
+                        elif len(p_it) <= 4:
+                            it_dict['aprox_str'] = "[" + ", ".join(f"{float(v):.4f}" for v in p_it) + "]"
+                        elif len(p_it) > 4:
+                            it_dict['aprox_str'] = f"[{float(p_it[0]):.4f}, ... ({len(p_it)} elems)]"
+                        else:
+                            it_dict['aprox_str'] = "-"
+                    else:
+                        it_dict['aprox_str'] = str(p_it)
+                except Exception:
+                    it_dict['aprox_str'] = str(it['aproximacion_json']) if it['aproximacion_json'] else "-"
                 iter_list.append(it_dict)
 
             ej_dict = dict(ej)
