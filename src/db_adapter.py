@@ -135,45 +135,43 @@ class TursoConnection:
         }
         req = urllib.request.Request(self.endpoint, data=payload, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=25) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Error de Turso HTTP {e.code}: {err_body}")
 
-    def execute(self, sql, params=()):
-        args = [_to_hrana_arg(p) for p in params]
-        requests_payload = [
-            {
-                "type": "execute",
-                "stmt": {
-                    "sql": sql,
-                    "args": args
-                }
-            },
-            {"type": "close"}
-        ]
-        data = self._send_pipeline(requests_payload)
-        results = data.get("results", [])
-        if not results:
-            return TursoCursor([], [])
-
-        step = results[0]
+    def _parse_step(self, step):
         if step.get("type") == "error":
             raise RuntimeError(f"Error SQL en Turso: {step.get('error', {}).get('message', 'Desconocido')}")
-
         result_data = step.get("response", {}).get("result", {})
         raw_cols = result_data.get("cols", [])
         cols = [c["name"] for c in raw_cols]
         raw_rows = result_data.get("rows", [])
-
-        unwrapped_rows = []
-        for r in raw_rows:
-            unwrapped_rows.append([_from_hrana_val(cell) for cell in r])
-
+        unwrapped_rows = [[_from_hrana_val(cell) for cell in r] for r in raw_rows]
         last_id = result_data.get("last_insert_rowid")
         return TursoCursor(cols, unwrapped_rows, last_insert_rowid=last_id)
+
+    def execute_pipeline(self, stmts):
+        """Ejecuta múltiples sentencias (sql, params) en un único round-trip HTTP a Turso."""
+        if not stmts:
+            return []
+        requests_payload = [
+            {
+                "type": "execute",
+                "stmt": {"sql": sql, "args": [_to_hrana_arg(p) for p in params]}
+            }
+            for sql, params in stmts
+        ]
+        requests_payload.append({"type": "close"})
+        data = self._send_pipeline(requests_payload)
+        results = data.get("results", [])
+        return [self._parse_step(results[i]) for i in range(len(stmts))]
+
+    def execute(self, sql, params=()):
+        cursors = self.execute_pipeline([(sql, params)])
+        return cursors[0] if cursors else TursoCursor([], [])
 
     def executemany(self, sql, params_list):
         if not params_list:
@@ -204,6 +202,21 @@ class TursoConnection:
             })
         requests_payload.append({"type": "close"})
         self._send_pipeline(requests_payload)
+
+
+def run_pipeline(conn, stmts):
+    """Ejecuta una lista de (sql, params) en batch tanto en Turso como en SQLite local."""
+    if isinstance(conn, TursoConnection):
+        return conn.execute_pipeline(stmts)
+    out = []
+    for sql, params in stmts:
+        cur = conn.execute(sql, params)
+        cols = [d[0] for d in cur.description] if cur.description else []
+        rows = [list(r) for r in cur.fetchall()] if cur.description else []
+        last_id = cur.lastrowid
+        cur.close()
+        out.append(TursoCursor(cols, rows, last_insert_rowid=last_id))
+    return out
 
 
 def get_db():
