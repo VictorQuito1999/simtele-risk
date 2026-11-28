@@ -1,10 +1,10 @@
 """
-SIMTELE-RISK: Aplicación Web Integrada (Semana 1 y Semana 2 Completa).
-Cubre los 4 Módulos Obligatorios con Escenarios NORMAL, ESTRÉS y MAL CONDICIONADO.
-Flask + SQLite + NumPy + Chart.js.
+SIMTELE-RISK: Aplicación Web Integrada (Versión Final · Semana 3).
+Cubre los 4 Módulos Obligatorios con Escenarios NORMAL, ESTRÉS, MAL CONDICIONADO y PERSONALIZADO.
+Flask + SQLite / Turso LibSQL + NumPy + Chart.js + MathJax.
 Ejecutar: python src/app.py
 """
-import json, time, sqlite3, os, sys, urllib.parse
+import json, os, sys, urllib.parse
 
 # Asegurar que la carpeta 'src' esté en sys.path para importaciones en Vercel y local
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -14,17 +14,18 @@ if CURRENT_DIR not in sys.path:
 from flask import Flask, render_template, request, redirect, url_for, abort
 import numpy as np
 
-from metodos import cond
+from metodos import cond, METODOS, radio_espectral_jacobi, radio_espectral_gs
 import modulo1
 import modulo2
 import modulo3
 import modulo4
-from db_adapter import get_db, DB_PATH
+from db_adapter import get_db, run_pipeline, DB_PATH
 
 DB = DB_PATH
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
+
 
 class VercelPathFixMiddleware:
     """Middleware WSGI para corregir PATH_INFO en Vercel Serverless Functions."""
@@ -57,10 +58,13 @@ class VercelPathFixMiddleware:
 
         return self.wsgi_app(environ, start_response)
 
+
 app.wsgi_app = VercelPathFixMiddleware(app.wsgi_app)
+
 
 def db():
     return get_db()
+
 
 def init():
     try:
@@ -71,6 +75,7 @@ def init():
                 c.executescript(schema_sql)
     except Exception as e:
         print(f"Init DB notice: {e}")
+
 
 CASOS_INFO = {
     1: {
@@ -103,6 +108,7 @@ CASOS_INFO = {
     }
 }
 
+
 # ---------- Rutas Principales ----------
 
 @app.route('/')
@@ -110,9 +116,11 @@ CASOS_INFO = {
 def inicio():
     return render_template('index.html')
 
+
 @app.route('/teoria-errores')
 def teoria_errores():
     return render_template('teoria.html')
+
 
 @app.route('/modulo/<int:cid>')
 def modulo(cid):
@@ -120,7 +128,8 @@ def modulo(cid):
         abort(404)
     return render_template('modulo.html', caso=CASOS_INFO[cid])
 
-# ---------- Funciones Auxiliares de Formato ----------
+
+# ---------- Funciones Auxiliares de Formato y Muestreo ----------
 
 def _format_x_json(h):
     val = h.get('x')
@@ -135,8 +144,9 @@ def _format_x_json(h):
         if isinstance(arr, list):
             return json.dumps(arr)
         return json.dumps([arr])
-    except:
+    except Exception:
         return json.dumps([])
+
 
 def _format_residual(h):
     r = h.get('residual')
@@ -147,49 +157,117 @@ def _format_residual(h):
             r_val = float(abs(r))
             if np.isfinite(r_val):
                 return r_val
-        except:
+        except Exception:
             pass
     return None
 
-# ---------- Ejecución de Escenarios Predefinidos (Los 4 Módulos) ----------
 
-@app.route('/correr/<int:cid>/<tipo>')
-def correr(cid, tipo):
-    if tipo not in ('NORMAL', 'ESTRES', 'MAL_CONDICIONADO'):
-        abort(404)
-    
+def _sample_history(hist_rows, max_rows=80):
+    """Mantiene completo hist_rows hasta 80 elementos; si excede (ej. 5000 iters), muestrea conservando inicio y fin."""
+    n = len(hist_rows)
+    if n <= max_rows:
+        return hist_rows
+    head = list(range(25))
+    tail = list(range(n - 25, n))
+    mid_count = max_rows - 50
+    mid = np.linspace(25, n - 26, mid_count, dtype=int).tolist()
+    idxs = sorted(set(head + mid + tail))
+    return [hist_rows[i] for i in idxs]
+
+
+# ---------- Motor Unificado de Ejecución (Predefinidos y Personalizados) ----------
+
+def _ejecutar_modulo(cid, tipo, custom=None):
+    """Ejecuta cualquier módulo en modo predefinido o personalizado y devuelve (params, out)."""
+    custom = custom or {}
     if cid == 1:
-        e, analitica, out_m1 = modulo1.ejecutar(tipo)
+        if tipo in ('NORMAL', 'ESTRES', 'MAL_CONDICIONADO'):
+            e, analitica, out_m1 = modulo1.ejecutar(tipo)
+        else:
+            v0 = float(custom.get('v0', 5.0))
+            a = float(custom.get('a', 1.0))
+            tr = float(custom.get('tr', 1.0))
+            L = float(custom.get('L', 20.0))
+            h = float(custom.get('h', 0.05))
+            no_lineal = bool(custom.get('no_lineal', False))
+            e, analitica, out_m1 = modulo1.ejecutar_calculo(v0, a, tr, L, h=h, no_lineal=no_lineal, tipo='PERSONALIZADO')
+
+        rk4 = out_m1['RK4']
+        rk2 = out_m1['RK2 (Heun)']
         params = dict(
             caso_id=cid,
+            tipo=e['tipo'],
             v0=e['v0'],
             a=e['a'],
             tr=e['tr'],
             L=e['L'],
             h=e['h'],
+            no_lineal=e['no_lineal'],
             d_total=analitica['d_total'],
+            d_rk4=rk4['d_final'],
+            err_rel_rk4=rk4['err_rel'],
+            err_rel_rk2=rk2['err_rel'],
             t_total=analitica['t_total'],
-            analitica=analitica
+            analitica=analitica,
+            plot_data=out_m1['plot_data']
         )
         out = {}
         for m_name in ['RK2 (Heun)', 'RK4']:
             r_sim = out_m1[m_name]
-            h_list = [dict(k=i, x=[r_sim['x_vals'][i]], residual=r_sim['v_vals'][i], err_abs=abs(r_sim['x_vals'][i] - analitica['d_total']), err_rel=abs(r_sim['x_vals'][i] - analitica['d_total'])/analitica['d_total']) for i in range(min(50, len(r_sim['t_vals'])))]
-            out[m_name] = dict(converged=True, iters=r_sim['pasos'], tiempo_ms=r_sim['tiempo_ms'], x=[r_sim['d_final']], hist=h_list)
+            out[m_name] = dict(
+                converged=True,
+                iters=r_sim['pasos'],
+                paso=e['h'],
+                tiempo_ms=r_sim['tiempo_ms'],
+                x=[r_sim['d_final']],
+                hist=r_sim['hist']
+            )
         for r_name, r_res in out_m1['Raíces'].items():
-            r_res['x'] = [r_res['root']]
             out[f"Raíz detención ({r_name})"] = r_res
-        # Integración Trapecio
-        out['Integración Trapecio (v(t))'] = dict(
-            converged=True,
-            iters=len(out_m1['Trapecio']['hist']),
-            tiempo_ms=0.2,
-            x=[out_m1['Trapecio']['d_int']],
-            hist=out_m1['Trapecio']['hist']
-        )
+        for int_name in ['Trapecio', 'Simpson 1/3']:
+            int_res = out_m1[int_name]
+            out[f"Integración {int_name} (v(t))"] = dict(
+                converged=True,
+                iters=len(int_res['hist']),
+                tiempo_ms=int_res['tiempo_ms'],
+                x=[int_res['d_int']],
+                hist=int_res['hist']
+            )
+        return params, out
 
     elif cid == 2:
-        e, out = modulo2.ejecutar(tipo)
+        if tipo in ('NORMAL', 'ESTRES', 'MAL_CONDICIONADO'):
+            e, out = modulo2.ejecutar(tipo)
+        else:
+            D0 = float(custom.get('D0', 0.10))
+            alpha = float(custom.get('alpha', 0.02))
+            beta = float(custom.get('beta', 0.001))
+            Dumbral = float(custom.get('D_umbral', custom.get('Dumbral', 0.60)))
+            n = int(custom.get('n', 4))
+            tol = float(custom.get('tol', 1e-8))
+            A = np.array(custom['A'], dtype=float) if 'A' in custom else modulo2.tridiag(n)
+            xs = np.array(custom['x_ref'], dtype=float) if 'x_ref' in custom else np.arange(1, n + 1, dtype=float)
+            b = np.array(custom['b'], dtype=float) if 'b' in custom else (A @ xs)
+            t_exacto, out_raices = modulo2.calcular_tiempo_umbral(D0, alpha, beta, Dumbral, tol=tol)
+            import time as _t
+            out_lin = {}
+            for m, f in METODOS.items():
+                t0 = _t.perf_counter()
+                res = f(A, b, xs, tol=tol, max_iter=5000)
+                res['tiempo_ms'] = (_t.perf_counter() - t0) * 1000.0
+                out_lin[m] = res
+            out = {**out_lin, **out_raices}
+            e = dict(
+                tipo='PERSONALIZADO', A=A, b=b, xs=xs, tol=tol,
+                pert=float(custom.get('perturbacion', 0.0)),
+                D0=D0, alpha=alpha, beta=beta, D_umbral=Dumbral,
+                t_exacto=float(t_exacto),
+                cond_A=float(cond(A)),
+                rho_j=float(radio_espectral_jacobi(A)) if len(b) <= 10 else None,
+                rho_gs=float(radio_espectral_gs(A)) if len(b) <= 10 else None
+            )
+
+        r_new = out.get('Newton-Raphson', {})
         params = dict(
             caso_id=cid,
             n=len(e['b']),
@@ -202,412 +280,347 @@ def correr(cid, tipo):
             alpha=e['alpha'],
             beta=e['beta'],
             D_umbral=e['D_umbral'],
-            t_exacto=e['t_exacto']
+            t_exacto=e['t_exacto'],
+            cond_A=e.get('cond_A', float(cond(e['A']))),
+            rho_j=e.get('rho_j'),
+            rho_gs=e.get('rho_gs'),
+            newton_iters=r_new.get('iters', 5)
         )
+        return params, out
 
     elif cid == 3:
-        e, x_exact, out_m3 = modulo3.ejecutar(tipo)
+        if tipo in ('NORMAL', 'ESTRES', 'MAL_CONDICIONADO'):
+            e, x_exact, out_m3 = modulo3.ejecutar(tipo)
+        else:
+            m = float(custom.get('m', 3000.0))
+            c_val = float(custom.get('c', 600.0))
+            k = float(custom.get('k', 12000.0))
+            F0 = float(custom.get('F0', 800.0))
+            omega_f = float(custom.get('omega_f', 1.5))
+            x0 = float(custom.get('x0', 0.3))
+            v0 = float(custom.get('v0', 0.0))
+            t_max = float(custom.get('t_max', 15.0))
+            h = float(custom.get('h', 0.02))
+            w0 = float(np.sqrt(k / m))
+            zeta = float(c_val / (2.0 * np.sqrt(k * m)))
+            wd = float(w0 * np.sqrt(max(1.0 - zeta ** 2, 1e-8)))
+            e_cfg = dict(
+                tipo='PERSONALIZADO', m=m, c=c_val, k=k, F0=F0, omega_f=omega_f,
+                x0=x0, v0=v0, t_max=t_max, h=h, w0=w0, zeta=zeta, wd=wd
+            )
+            e, x_exact, out_m3 = modulo3.ejecutar_calculo(e_cfg)
+
         params = dict(
             caso_id=cid,
-            m=e['m'],
-            c=e['c'],
-            k=e['k'],
-            F0=e['F0'],
-            omega_f=e['omega_f'],
-            x0=e['x0'],
-            v0=e['v0'],
-            t_max=e['t_max'],
-            h=e['h'],
-            zeta=e['zeta'],
-            w0=e['w0'],
-            x_max=out_m3['RK4']['x_max']
+            tipo=e['tipo'],
+            m=float(e['m']),
+            c=float(e['c']),
+            k=float(e['k']),
+            F0=float(e['F0']),
+            omega_f=float(e['omega_f']),
+            x0=float(e['x0']),
+            v0=float(e['v0']),
+            t_max=float(e['t_max']),
+            h=float(e['h']),
+            zeta=float(e['zeta']),
+            w0=float(e['w0']),
+            x_max=float(out_m3['RK4']['x_max']),
+            err_rel_rk4=float(out_m3['RK4']['err_rel']),
+            err_rel_rk2=float(out_m3['RK2 (Heun)']['err_rel']),
+            plot_data=out_m3['plot_data']
         )
         out = {}
         for m_name in ['RK2 (Heun)', 'RK4']:
             r_sim = out_m3[m_name]
-            h_list = [dict(k=i, x=[r_sim['x_vals'][i]], residual=r_sim['v_vals'][i], err_abs=abs(r_sim['x_vals'][i] - x_exact[i]), err_rel=abs(r_sim['x_vals'][i] - x_exact[i])/(abs(x_exact[i])+1e-12)) for i in range(min(50, len(r_sim['t_vals'])))]
-            out[m_name] = dict(converged=True, iters=r_sim['pasos'], tiempo_ms=r_sim['tiempo_ms'], x=[r_sim['x_max']], hist=h_list)
+            out[m_name] = dict(
+                converged=True,
+                iters=r_sim['pasos'],
+                paso=float(e['h']),
+                tiempo_ms=r_sim['tiempo_ms'],
+                x=[r_sim['x_max']],
+                hist=r_sim['hist']
+            )
         for int_name in ['Trapecio', 'Simpson 1/3', 'Romberg']:
             int_res = out_m3[int_name]
-            out[f"Integral energía ({int_name})"] = dict(converged=True, iters=int_res.get('steps', 1), tiempo_ms=0.1, x=[int_res['integral']], hist=[dict(k=1, x=[int_res['integral']], residual=0, err_abs=int_res.get('err_rel', 0), err_rel=int_res.get('err_rel', 0))])
+            out[f"Integral energía ({int_name})"] = dict(
+                converged=True,
+                iters=int_res.get('steps', len(int_res.get('hist', []))),
+                tiempo_ms=int_res.get('tiempo_ms', 0.1),
+                x=[int_res['integral']],
+                hist=int_res.get('hist', [dict(k=1, x=[int_res['integral']], residual=0, err_abs=int_res.get('err_abs', 0), err_rel=int_res.get('err_rel', 0))])
+            )
+        return params, out
 
     elif cid == 4:
-        e, y_oc, out_m4 = modulo4.ejecutar(tipo)
+        if tipo in ('NORMAL', 'ESTRES', 'MAL_CONDICIONADO'):
+            e, y_oc, out_m4 = modulo4.ejecutar(tipo)
+        else:
+            n_nodos = int(custom.get('n_nodos', 10))
+            ruido = float(custom.get('ruido_sigma', custom.get('ruido', 0.0)))
+            tipo_func = custom.get('tipo_func', 'sin')
+            e, y_oc, out_m4 = modulo4.ejecutar_calculo(n_nodos=n_nodos, ruido_sigma=ruido, tipo_func=tipo_func, tipo='PERSONALIZADO')
+
         params = dict(
             caso_id=cid,
-            tipo=tipo,
+            tipo=e['tipo'],
+            tipo_func=e.get('tipo_func', 'runge' if e['tipo'] == 'MAL_CONDICIONADO' else 'sin'),
             n_nodos=len(e['t_nodes']),
-            ruido_sigma=e['ruido_sigma'],
+            ruido_sigma=float(e['ruido_sigma']),
             t_nodes=e['t_nodes'].tolist(),
-            y_nodes=e['y_nodes'].tolist()
+            y_nodes=e['y_nodes'].tolist(),
+            err_rel_lag=float(out_m4['Lagrange']['err_rel']),
+            err_rel_new=float(out_m4['Newton']['err_rel']),
+            err_rel_spl=float(out_m4['Splines Cúbicos']['err_rel']),
+            plot_data=out_m4['plot_data']
         )
-        out = {}
-        for m_name in ['Lagrange', 'Newton', 'Splines Cúbicos']:
-            out[m_name] = out_m4[m_name]
+        out = {m_name: out_m4[m_name] for m_name in ['Lagrange', 'Newton', 'Splines Cúbicos']}
+        return params, out
 
-    else:
-        abort(404)
+    abort(404)
 
+
+def _guardar_simulacion(cid, tipo, fuente_datos, params, out):
+    """Persiste una simulación completa en 3 pipelines HTTP (compatible con Turso y SQLite local)."""
+    tol_default = params.get('tol', 1e-8)
     with db() as c:
-        esc = c.execute(
-            'INSERT INTO escenario(caso_id,tipo,parametros_json,fuente_datos) VALUES(?,?,?,?) RETURNING id',
-            (cid, tipo, json.dumps(params), f"Parámetros normativos y sintéticos de teleféricos ({tipo})")
-        ).fetchone()[0]
-
-        sim = c.execute('INSERT INTO simulacion(escenario_id) VALUES(?) RETURNING id', (esc,)).fetchone()[0]
-
-        for m_nombre, r_data in out.items():
-            ex = c.execute(
-                'INSERT INTO ejecucion_metodo(simulacion_id,metodo,tolerancia,max_iter,convergio,tiempo_ms) VALUES(?,?,?,?,?,?) RETURNING id',
-                (sim, m_nombre, params.get('tol', 1e-8), 5000, int(r_data.get('converged', True)), round(r_data.get('tiempo_ms', 0.0), 2))
-            ).fetchone()[0]
-
-            hist_rows = r_data.get('hist', [])
-            c.executemany(
-                'INSERT INTO iteracion_resultado(ejecucion_id,numero,aproximacion_json,residual,error_abs,error_rel) VALUES(?,?,?,?,?,?)',
-                [(ex, h['k'], _format_x_json(h),
-                  _format_residual(h),
-                  None if (h.get('err_abs') is None or not np.isfinite(h.get('err_abs'))) else float(h.get('err_abs')),
-                  None if (h.get('err_rel') is None or not np.isfinite(h.get('err_rel'))) else float(h.get('err_rel')))
-                 for h in hist_rows]
+        # Pipeline 1: escenario + simulacion
+        c1, c2 = run_pipeline(c, [
+            (
+                'INSERT INTO escenario(caso_id,tipo,parametros_json,fuente_datos) VALUES(?,?,?,?) RETURNING id',
+                (cid, tipo, json.dumps(params), fuente_datos)
+            ),
+            (
+                'INSERT INTO simulacion(escenario_id) VALUES(last_insert_rowid()) RETURNING id',
+                ()
             )
+        ])
+        sim = c2.fetchone()[0]
+
+        # Pipeline 2: todas las ejecuciones de métodos en 1 round-trip
+        metodos_ordenados = list(out.items())
+        exec_stmts = [
+            (
+                'INSERT INTO ejecucion_metodo(simulacion_id,metodo,tolerancia,paso,max_iter,convergio,tiempo_ms) VALUES(?,?,?,?,?,?,?) RETURNING id',
+                (
+                    sim,
+                    m_nombre,
+                    tol_default,
+                    r_data.get('paso'),
+                    5000,
+                    int(r_data.get('converged', True)),
+                    round(float(r_data.get('tiempo_ms', 0.0)), 2)
+                )
+            )
+            for m_nombre, r_data in metodos_ordenados
+        ]
+        exec_cursors = run_pipeline(c, exec_stmts)
+        exec_ids = [cur.fetchone()[0] for cur in exec_cursors]
+
+        # Pipeline 3: iteraciones (muestreadas si >80) + resultado_resumen en 1 round-trip
+        detail_stmts = []
+        for ex_id, (m_nombre, r_data) in zip(exec_ids, metodos_ordenados):
+            hist_rows = _sample_history(r_data.get('hist', []), max_rows=80)
+            for h in hist_rows:
+                ea = h.get('err_abs')
+                er = h.get('err_rel')
+                ea_val = None if (ea is None or not np.isfinite(ea)) else float(ea)
+                er_val = None if (er is None or not np.isfinite(er)) else float(er)
+                detail_stmts.append((
+                    'INSERT INTO iteracion_resultado(ejecucion_id,numero,aproximacion_json,residual,error_abs,error_rel) VALUES(?,?,?,?,?,?)',
+                    (ex_id, int(h['k']), _format_x_json(h), _format_residual(h), ea_val, er_val)
+                ))
 
             val_final = np.asarray(r_data.get('x', [])).tolist()
-            ref_str = f"Caso {cid} - {tipo}"
-            c.execute(
+            total_iters = r_data.get('iters', len(r_data.get('hist', [])))
+            metrica = {
+                'converged': bool(r_data.get('converged', True)),
+                'iters_totales': int(total_iters)
+            }
+            detail_stmts.append((
                 'INSERT INTO resultado_resumen(ejecucion_id,referencia,valor_json,metrica_error_json,interpretacion) VALUES(?,?,?,?,?)',
-                (ex, ref_str, json.dumps(val_final), json.dumps({'converged': bool(r_data.get('converged', True))}), 'Resultado comprobado contra referencia analítica/numérica.')
-            )
+                (ex_id, f"Caso {cid} - {tipo}", json.dumps(val_final), json.dumps(metrica), 'Resultado comprobado contra referencia analítica/numérica.')
+            ))
 
+        # Si hubiese muchos inserts, enviar en bloques seguros de hasta 250 sentencias
+        for i in range(0, len(detail_stmts), 250):
+            run_pipeline(c, detail_stmts[i:i + 250])
+
+    return sim
+
+
+# ---------- Ejecución de Escenarios Predefinidos (Los 4 Módulos) ----------
+
+@app.route('/correr/<int:cid>/<tipo>')
+def correr(cid, tipo):
+    if tipo not in ('NORMAL', 'ESTRES', 'MAL_CONDICIONADO'):
+        abort(404)
+    params, out = _ejecutar_modulo(cid, tipo)
+    sim = _guardar_simulacion(
+        cid, tipo,
+        f"Parámetros normativos y sintéticos de teleféricos ({tipo})",
+        params, out
+    )
     return redirect(url_for('ver_simulacion', sid=sim))
+
 
 # ---------- Simulación Personalizada (Formularios POST) ----------
 
 @app.route('/simular-custom/<int:cid>', methods=['POST'])
 def simular_custom(cid):
     if cid == 1:
-        v0 = float(request.form.get('v0', 5.0))
-        a = float(request.form.get('a', 1.0))
-        tr = float(request.form.get('tr', 1.0))
-        L = float(request.form.get('L', 20.0))
-        h = 0.05
-        analitica = modulo1.sol_analitica(v0, a, tr)
-        t_max = max(analitica['t_total'] * 1.5, 30.0)
-        rk2 = modulo1.simular_rk('RK2 (Heun)', v0, a, tr, t_max, h)
-        rk4 = modulo1.simular_rk('RK4', v0, a, tr, t_max, h)
-        
-        # Búsqueda de raíces sobre ecuación cinemática x(t) = d_total
-        f_t = lambda t: v0 * tr + v0 * (t - tr) - 0.5 * a * ((t - tr)**2) - analitica['d_total']
-        df_t = lambda t: v0 - a * (t - tr)
-        xr_t = analitica['t_total']
-        r_bis = modulo1.biseccion(f_t, tr, t_max, xr=xr_t, tol=1e-8)
-        r_new = modulo1.newton_raphson(f_t, df_t, x0=tr + 0.5, xr=xr_t, tol=1e-8)
-        r_sec = modulo1.secante(f_t, x0=tr + 0.2, x1=t_max, xr=xr_t, tol=1e-8)
-        
-        for r in [r_bis, r_new, r_sec]:
-            r['tiempo_ms'] = 0.05
-            r['x'] = [r['root']] if r.get('root') is not None else []
-            for h_row in r.get('hist', []):
-                if 'residual' not in h_row or h_row['residual'] is None:
-                    h_row['residual'] = abs(h_row.get('fx', 0.0))
-                if isinstance(h_row.get('x'), (int, float)):
-                    h_row['x'] = [h_row['x']]
-                    
-        # Integración Trapecio acumulada
-        v_arr = np.array(rk4['v_vals'])
-        t_arr = np.array(rk4['t_vals'])
-        d_trap = float(np.trapezoid(v_arr, t_arr))
-        n_pts = len(t_arr)
-        step_stride = max(1, n_pts // 50)
-        indices = list(range(1, n_pts, step_stride))
-        if (n_pts - 1) not in indices:
-            indices.append(n_pts - 1)
-        trap_hist = []
-        for idx_k, i in enumerate(indices, start=1):
-            sub_d = float(np.trapezoid(v_arr[:i+1], t_arr[:i+1]))
-            sub_exact = rk4['x_vals'][i]
-            ea = abs(sub_d - sub_exact)
-            er = ea / (abs(sub_exact) + 1e-12)
-            trap_hist.append(dict(k=idx_k, x=[sub_d], residual=abs(sub_d - analitica['d_total']), fx=sub_d - analitica['d_total'], err_abs=ea, err_rel=er))
-
-        params = dict(caso_id=cid, v0=v0, a=a, tr=tr, L=L, h=h, d_total=analitica['d_total'], t_total=analitica['t_total'])
-        out = {
-            'RK2 (Heun)': dict(
-                converged=True, iters=rk2['pasos'], tiempo_ms=rk2['tiempo_ms'], x=[rk2['d_final']],
-                hist=[dict(k=i, x=[rk2['x_vals'][i]], residual=rk2['v_vals'][i], err_abs=abs(rk2['x_vals'][i]-analitica['d_total']), err_rel=abs(rk2['x_vals'][i]-analitica['d_total'])/analitica['d_total']) for i in range(min(50, len(rk2['t_vals'])))]
-            ),
-            'RK4': dict(
-                converged=True, iters=rk4['pasos'], tiempo_ms=rk4['tiempo_ms'], x=[rk4['d_final']],
-                hist=[dict(k=i, x=[rk4['x_vals'][i]], residual=rk4['v_vals'][i], err_abs=abs(rk4['x_vals'][i]-analitica['d_total']), err_rel=abs(rk4['x_vals'][i]-analitica['d_total'])/analitica['d_total']) for i in range(min(50, len(rk4['t_vals'])))]
-            ),
-            'Raíz detención (Bisección)': r_bis,
-            'Raíz detención (Newton)': r_new,
-            'Raíz detención (Secante)': r_sec,
-            'Integración Trapecio (v(t))': dict(
-                converged=True, iters=len(trap_hist), tiempo_ms=0.2, x=[d_trap], hist=trap_hist
-            )
-        }
-
+        custom = dict(
+            v0=float(request.form.get('v0', 5.0)),
+            a=float(request.form.get('a', 1.0)),
+            tr=float(request.form.get('tr', 1.0)),
+            L=float(request.form.get('L', 20.0))
+        )
     elif cid == 2:
-        D0 = float(request.form.get('D0', 0.10))
-        alpha = float(request.form.get('alpha', 0.02))
-        beta = float(request.form.get('beta', 0.001))
-        Dumbral = float(request.form.get('Dumbral', 0.60))
-        n = 4
-        A = modulo2.tridiag(n)
-        xs = np.arange(1, n+1, dtype=float)
-        b = A @ xs
-        t_exacto, out_raices = modulo2.calcular_tiempo_umbral(D0, alpha, beta, Dumbral)
-        out_lin = {m: f(A, b, xs) for m, f in modulo2.METODOS.items()}
-        for m, r in out_lin.items(): r['tiempo_ms'] = 0.5
-        out = {**out_lin, **out_raices}
-        params = dict(
-            caso_id=cid, n=n, tol=1e-8, perturbacion=0.0,
-            A=A.tolist(), b=b.tolist(), x_ref=xs.tolist(),
-            D0=D0, alpha=alpha, beta=beta, D_umbral=Dumbral, t_exacto=t_exacto
+        custom = dict(
+            D0=float(request.form.get('D0', 0.10)),
+            alpha=float(request.form.get('alpha', 0.02)),
+            beta=float(request.form.get('beta', 0.001)),
+            Dumbral=float(request.form.get('Dumbral', 0.60))
         )
-
     elif cid == 3:
-        m = float(request.form.get('m', 3000.0))
-        c_val = float(request.form.get('c', 600.0))
-        k = float(request.form.get('k', 12000.0))
-        F0 = float(request.form.get('F0', 800.0))
-        omega_f = float(request.form.get('omega_f', 1.5))
-        w0 = np.sqrt(k / m)
-        zeta = c_val / (2.0 * np.sqrt(k * m))
-        wd = w0 * np.sqrt(max(1.0 - zeta**2, 1e-8))
-        e = dict(tipo='PERSONALIZADO', m=m, c=c_val, k=k, F0=F0, omega_f=omega_f, x0=0.3, v0=0.0, t_max=15.0, h=0.02, w0=w0, zeta=zeta, wd=wd)
-        rk4 = modulo3.simular('RK4', e)
-        rk2 = modulo3.simular('RK2 (Heun)', e)
-        t_arr = np.array(rk4['t_vals'])
-        x_rk4 = np.array(rk4['x_vals'])
-        x_rk2 = np.array(rk2['x_vals'])
-        
-        # Solución de referencia (analítica si libre F0==0, o RK4 si forzada)
-        if F0 == 0:
-            x_ref = modulo3.sol_analitica_libre(t_arr, e['x0'], e['v0'], zeta, w0, wd)
-        else:
-            x_ref = x_rk4
-            
-        int_trap = float(np.trapezoid(x_rk4**2, t_arr))
-        int_simp = float(np.trapezoid(x_rk4**2, t_arr)) # aproximación por tramos
-        
-        h_rk2 = [dict(k=i, x=[x_rk2[i]], residual=rk2['v_vals'][i], err_abs=abs(x_rk2[i] - x_ref[i]), err_rel=abs(x_rk2[i] - x_ref[i])/(abs(x_ref[i])+1e-12)) for i in range(min(50, len(t_arr)))]
-        h_rk4 = [dict(k=i, x=[x_rk4[i]], residual=rk4['v_vals'][i], err_abs=abs(x_rk4[i] - x_ref[i]), err_rel=abs(x_rk4[i] - x_ref[i])/(abs(x_ref[i])+1e-12)) for i in range(min(50, len(t_arr)))]
-        
-        params = dict(caso_id=cid, m=m, c=c_val, k=k, F0=F0, omega_f=omega_f, x0=0.3, v0=0.0, t_max=15.0, h=0.02, zeta=zeta, w0=w0, x_max=rk4['x_max'])
-        out = {
-            'RK2 (Heun)': dict(converged=True, iters=rk2['pasos'], tiempo_ms=rk2['tiempo_ms'], x=[rk2['x_max']], hist=h_rk2),
-            'RK4': dict(converged=True, iters=rk4['pasos'], tiempo_ms=rk4['tiempo_ms'], x=[rk4['x_max']], hist=h_rk4),
-            'Integral energía (Trapecio)': dict(converged=True, iters=len(t_arr), tiempo_ms=0.2, x=[int_trap], hist=[dict(k=1, x=[int_trap], residual=0, err_abs=1e-4, err_rel=1e-4)]),
-            'Integral energía (Simpson 1/3)': dict(converged=True, iters=len(t_arr), tiempo_ms=0.2, x=[int_simp], hist=[dict(k=1, x=[int_simp], residual=0, err_abs=1e-6, err_rel=1e-6)])
-        }
-
-    elif cid == 4:
-        n_nodos = int(request.form.get('n_nodos', 10))
-        ruido = float(request.form.get('ruido', 0.0))
-        tipo_func = request.form.get('tipo_func', 'sin')
-        
-        if tipo_func == 'runge':
-            a_dom, b_dom = -1.0, 1.0
-            func_real = lambda t: 1.0 / (1.0 + 25.0 * (t**2))
-            t_nodes = np.linspace(a_dom, b_dom, n_nodos)
-            t_ocultos = np.array([-0.95, -0.85, 0.85, 0.95])
-        else:
-            a_dom, b_dom = 0.0, np.pi
-            func_real = lambda t: np.sin(t)
-            t_nodes = np.linspace(a_dom, b_dom, n_nodos)
-            t_ocultos = (t_nodes[:-1] + t_nodes[1:]) / 2.0
-            
-        y_nodes_clean = np.array([func_real(ti) for ti in t_nodes])
-        if ruido > 0:
-            rng = np.random.default_rng(42)
-            y_nodes = y_nodes_clean + rng.normal(0, ruido, len(t_nodes))
-        else:
-            y_nodes = y_nodes_clean
-            
-        y_real_oc = np.array([func_real(ti) for ti in t_ocultos])
-        
-        # 1. Lagrange
-        t0_m = time.perf_counter()
-        y_lag_ev = lambda x_ev: modulo4.lagrange_eval(t_nodes, y_nodes, x_ev)
-        y_lag_oc = y_lag_ev(t_ocultos)
-        t_lag = (time.perf_counter() - t0_m) * 1000.0
-        err_lag = float(np.mean(np.abs(y_lag_oc - y_real_oc))) / float(np.mean(np.abs(y_real_oc)) + 1e-12)
-        
-        # 2. Newton
-        t0_m = time.perf_counter()
-        coefs_new = modulo4.newton_dif_div(t_nodes, y_nodes)
-        y_new_ev = lambda x_ev: modulo4.newton_eval(t_nodes, coefs_new, x_ev)
-        y_new_oc = y_new_ev(t_ocultos)
-        t_new = (time.perf_counter() - t0_m) * 1000.0
-        err_new = float(np.mean(np.abs(y_new_oc - y_real_oc))) / float(np.mean(np.abs(y_real_oc)) + 1e-12)
-        
-        # 3. Splines Cúbicos
-        t0_m = time.perf_counter()
-        spl = modulo4.splines_cubicos_naturales(t_nodes, y_nodes)
-        y_spl_ev = lambda x_ev: modulo4.splines_eval(spl, x_ev)
-        y_spl_oc = y_spl_ev(t_ocultos)
-        t_spl = (time.perf_counter() - t0_m) * 1000.0
-        err_spl = float(np.mean(np.abs(y_spl_oc - y_real_oc))) / float(np.mean(np.abs(y_real_oc)) + 1e-12)
-        
-        params = dict(
-            caso_id=cid, tipo='PERSONALIZADO', n_nodos=n_nodos, ruido_sigma=ruido,
-            t_nodes=t_nodes.tolist(), y_nodes=y_nodes.tolist(), err_rel_spl=err_spl
+        custom = dict(
+            m=float(request.form.get('m', 3000.0)),
+            c=float(request.form.get('c', 600.0)),
+            k=float(request.form.get('k', 12000.0)),
+            F0=float(request.form.get('F0', 800.0)),
+            omega_f=float(request.form.get('omega_f', 1.5))
         )
-        
-        out = {
-            'Lagrange': dict(
-                converged=True, iters=n_nodos, tiempo_ms=t_lag, x=[err_lag],
-                hist=[dict(k=i, x=[float(y_lag_oc[i])], residual=abs(y_lag_oc[i]-y_real_oc[i]), err_abs=abs(y_lag_oc[i]-y_real_oc[i]), err_rel=abs(y_lag_oc[i]-y_real_oc[i])/(abs(y_real_oc[i])+1e-12)) for i in range(len(t_ocultos))]
-            ),
-            'Newton': dict(
-                converged=True, iters=n_nodos, tiempo_ms=t_new, x=[err_new],
-                hist=[dict(k=i, x=[float(y_new_oc[i])], residual=abs(y_new_oc[i]-y_real_oc[i]), err_abs=abs(y_new_oc[i]-y_real_oc[i]), err_rel=abs(y_new_oc[i]-y_real_oc[i])/(abs(y_real_oc[i])+1e-12)) for i in range(len(t_ocultos))]
-            ),
-            'Splines Cúbicos': dict(
-                converged=True, iters=n_nodos, tiempo_ms=t_spl, x=[err_spl],
-                hist=[dict(k=i, x=[float(y_spl_oc[i])], residual=abs(y_spl_oc[i]-y_real_oc[i]), err_abs=abs(y_spl_oc[i]-y_real_oc[i]), err_rel=abs(y_spl_oc[i]-y_real_oc[i])/(abs(y_real_oc[i])+1e-12)) for i in range(len(t_ocultos))]
-            )
-        }
-
+    elif cid == 4:
+        custom = dict(
+            n_nodos=int(request.form.get('n_nodos', 10)),
+            ruido=float(request.form.get('ruido', 0.0)),
+            tipo_func=request.form.get('tipo_func', 'sin')
+        )
     else:
         abort(404)
 
-    with db() as c:
-        esc = c.execute(
-            'INSERT INTO escenario(caso_id,tipo,parametros_json,fuente_datos) VALUES(?,?,?,?) RETURNING id',
-            (cid, 'PERSONALIZADO', json.dumps(params), 'Valores definidos por el usuario en interfaz web')
-        ).fetchone()[0]
-        sim = c.execute('INSERT INTO simulacion(escenario_id) VALUES(?) RETURNING id', (esc,)).fetchone()[0]
-        for m_nombre, r_data in out.items():
-            ex = c.execute(
-                'INSERT INTO ejecucion_metodo(simulacion_id,metodo,tolerancia,max_iter,convergio,tiempo_ms) VALUES(?,?,?,?,?,?) RETURNING id',
-                (sim, m_nombre, 1e-8, 5000, int(r_data.get('converged', True)), round(r_data.get('tiempo_ms', 0.0), 2))
-            ).fetchone()[0]
-            hist_rows = r_data.get('hist', [])
-            c.executemany(
-                'INSERT INTO iteracion_resultado(ejecucion_id,numero,aproximacion_json,residual,error_abs,error_rel) VALUES(?,?,?,?,?,?)',
-                [(ex, h['k'], _format_x_json(h),
-                  _format_residual(h),
-                  None if (h.get('err_abs') is None or not np.isfinite(h.get('err_abs'))) else float(h.get('err_abs')),
-                  None if (h.get('err_rel') is None or not np.isfinite(h.get('err_rel'))) else float(h.get('err_rel')))
-                 for h in hist_rows]
-            )
-            c.execute(
-                'INSERT INTO resultado_resumen(ejecucion_id,referencia,valor_json,metrica_error_json,interpretacion) VALUES(?,?,?,?,?)',
-                (ex, 'Referencia calculada', json.dumps(np.asarray(r_data.get('x', [])).tolist()), json.dumps({'converged': bool(r_data.get('converged', True))}), 'Simulación personalizada.')
-            )
-
+    params, out = _ejecutar_modulo(cid, 'PERSONALIZADO', custom=custom)
+    sim = _guardar_simulacion(
+        cid, 'PERSONALIZADO',
+        'Valores definidos por el usuario en interfaz web',
+        params, out
+    )
     return redirect(url_for('ver_simulacion', sid=sim))
 
+
 # ---------- Visualización de Simulación Detallada ----------
+
+def _format_aprox_val(raw_json, short=False):
+    if not raw_json:
+        return '-'
+    try:
+        parsed = json.loads(raw_json)
+        if isinstance(parsed, (int, float)):
+            return f"{float(parsed):.6f}"
+        if isinstance(parsed, list):
+            if len(parsed) == 1:
+                return f"{float(parsed[0]):.6f}"
+            if len(parsed) <= 4:
+                return "[" + ", ".join(f"{float(v):.4f}" for v in parsed) + "]"
+            if short:
+                return f"Vector [{len(parsed)} elem]"
+            return f"[{float(parsed[0]):.4f}, ... ({len(parsed)} elems)]"
+        return str(parsed)
+    except Exception:
+        return str(raw_json)
+
 
 @app.route('/simulacion/<int:sid>')
 def ver_simulacion(sid):
     with db() as c:
-        s = c.execute(
-            'SELECT s.id, s.fecha, s.estado, e.tipo, e.caso_id, e.parametros_json, c.nombre '
-            'FROM simulacion s '
-            'JOIN escenario e ON e.id=s.escenario_id '
-            'JOIN caso_estudio c ON c.id=e.caso_id '
-            'WHERE s.id=?', (sid,)
-        ).fetchone()
-        
+        c_sim, c_ej, c_it = run_pipeline(c, [
+            (
+                'SELECT s.id, s.fecha, s.estado, e.tipo, e.caso_id, e.parametros_json, c.nombre '
+                'FROM simulacion s '
+                'JOIN escenario e ON e.id=s.escenario_id '
+                'JOIN caso_estudio c ON c.id=e.caso_id '
+                'WHERE s.id=?',
+                (sid,)
+            ),
+            (
+                'SELECT m.id, m.metodo, m.convergio, m.tiempo_ms, r.valor_json, r.metrica_error_json '
+                'FROM ejecucion_metodo m '
+                'LEFT JOIN resultado_resumen r ON r.ejecucion_id=m.id '
+                'WHERE m.simulacion_id=? ORDER BY m.id ASC',
+                (sid,)
+            ),
+            (
+                'SELECT i.ejecucion_id, i.numero, i.aproximacion_json, i.residual, i.error_abs, i.error_rel '
+                'FROM iteracion_resultado i '
+                'JOIN ejecucion_metodo m ON m.id=i.ejecucion_id '
+                'WHERE m.simulacion_id=? ORDER BY i.ejecucion_id ASC, i.numero ASC',
+                (sid,)
+            )
+        ])
+
+        s = c_sim.fetchone()
         if not s:
             abort(404)
-            
-        ejecs_db = c.execute(
-            'SELECT id, metodo, convergio, tiempo_ms, '
-            '(SELECT COUNT(*) FROM iteracion_resultado WHERE ejecucion_id=m.id) it, '
-            '(SELECT residual FROM iteracion_resultado WHERE ejecucion_id=m.id ORDER BY numero DESC LIMIT 1) res, '
-            '(SELECT error_rel FROM iteracion_resultado WHERE ejecucion_id=m.id ORDER BY numero DESC LIMIT 1) er, '
-            '(SELECT aproximacion_json FROM iteracion_resultado WHERE ejecucion_id=m.id ORDER BY numero DESC LIMIT 1) ult_aprox '
-            'FROM ejecucion_metodo m WHERE simulacion_id=?', (sid,)
-        ).fetchall()
-        
-        ejecuciones = []
-        for ej in ejecs_db:
-            iter_rows = c.execute(
-                'SELECT numero, aproximacion_json, residual, error_abs, error_rel '
-                'FROM iteracion_resultado WHERE ejecucion_id=? ORDER BY numero ASC', (ej['id'],)
-            ).fetchall()
-            
-            aprox_str = '-'
-            if ej['ult_aprox']:
-                try:
-                    parsed = json.loads(ej['ult_aprox'])
-                    if isinstance(parsed, (int, float)):
-                        aprox_str = f"{float(parsed):.6f}"
-                    elif isinstance(parsed, list):
-                        if len(parsed) == 1:
-                            aprox_str = f"{float(parsed[0]):.6f}"
-                        elif len(parsed) <= 4:
-                            aprox_str = "[" + ", ".join(f"{float(v):.4f}" for v in parsed) + "]"
-                        else:
-                            aprox_str = f"Vector [{len(parsed)} elem]"
-                    else:
-                        aprox_str = str(parsed)
-                except Exception:
-                    aprox_str = str(ej['ult_aprox'])
-                    
-            iter_list = []
-            for it in iter_rows:
-                it_dict = dict(it)
-                try:
-                    p_it = json.loads(it['aproximacion_json']) if it['aproximacion_json'] else []
-                    if isinstance(p_it, (int, float)):
-                        it_dict['aprox_str'] = f"{float(p_it):.6f}"
-                    elif isinstance(p_it, list):
-                        if len(p_it) == 1:
-                            it_dict['aprox_str'] = f"{float(p_it[0]):.6f}"
-                        elif len(p_it) <= 4:
-                            it_dict['aprox_str'] = "[" + ", ".join(f"{float(v):.4f}" for v in p_it) + "]"
-                        elif len(p_it) > 4:
-                            it_dict['aprox_str'] = f"[{float(p_it[0]):.4f}, ... ({len(p_it)} elems)]"
-                        else:
-                            it_dict['aprox_str'] = "-"
-                    else:
-                        it_dict['aprox_str'] = str(p_it)
-                except Exception:
-                    it_dict['aprox_str'] = str(it['aproximacion_json']) if it['aproximacion_json'] else "-"
-                iter_list.append(it_dict)
+        ejecs_db = c_ej.fetchall()
+        all_iters = c_it.fetchall()
 
-            ej_dict = dict(ej)
-            ej_dict['aprox_str'] = aprox_str
-            ej_dict['iteraciones'] = iter_list
-            ejecuciones.append(ej_dict)
+    iters_by_ej = {}
+    for row in all_iters:
+        iters_by_ej.setdefault(row['ejecucion_id'], []).append(row)
+
+    ejecuciones = []
+    for ej in ejecs_db:
+        iter_rows = iters_by_ej.get(ej['id'], [])
+        iter_list = []
+        for it in iter_rows:
+            it_dict = dict(it)
+            it_dict['aprox_str'] = _format_aprox_val(it['aproximacion_json'], short=False)
+            iter_list.append(it_dict)
+
+        last_it = iter_rows[-1] if iter_rows else None
+        ult_aprox = last_it['aproximacion_json'] if last_it else ej['valor_json']
+        iters_totales = len(iter_rows)
+        if ej['metrica_error_json']:
+            try:
+                met = json.loads(ej['metrica_error_json'])
+                iters_totales = met.get('iters_totales', iters_totales)
+            except Exception:
+                pass
+
+        ej_dict = dict(ej)
+        ej_dict['it'] = iters_totales
+        ej_dict['res'] = last_it['residual'] if last_it else None
+        ej_dict['er'] = last_it['error_rel'] if last_it else None
+        ej_dict['aprox_str'] = _format_aprox_val(ult_aprox, short=True)
+        ej_dict['iteraciones'] = iter_list
+        ejecuciones.append(ej_dict)
 
     p = json.loads(s['parametros_json'])
     cid = s['caso_id']
 
     # 1. Preparar Gráfico 1: Fenómeno Físico para CADA uno de los 4 casos
     if cid == 1:
-        v0 = float(p.get('v0', 5.0))
-        a = float(p.get('a', 1.0))
-        tr = float(p.get('tr', 1.0))
         L_lim = float(p.get('L', 20.0))
-        t_tot = float(p.get('t_total', 6.0))
-        
-        t_steps = np.linspace(0, max(t_tot * 1.2, 10.0), 35)
-        x_steps = []
-        v_steps = []
-        for t in t_steps:
-            if t <= tr:
-                x_steps.append(v0 * t)
-                v_steps.append(v0)
-            elif t <= t_tot:
-                dt = t - tr
-                x_steps.append(v0 * tr + v0 * dt - 0.5 * a * (dt**2))
-                v_steps.append(max(v0 - a * dt, 0.0))
-            else:
-                x_steps.append(v0 * tr + (v0**2)/(2*a))
-                v_steps.append(0.0)
-                
+        pd = p.get('plot_data')
+        if pd and 't' in pd:
+            t_steps = pd['t']
+            x_steps = pd['x']
+            v_steps = pd['v']
+        else:
+            v0 = float(p.get('v0', 5.0))
+            a = float(p.get('a', 1.0))
+            tr = float(p.get('tr', 1.0))
+            t_tot = float(p.get('t_total', 6.0))
+            t_steps = np.linspace(0, max(t_tot * 1.2, 10.0), 35).tolist()
+            x_steps, v_steps = [], []
+            for t in t_steps:
+                xv, vv = modulo1.posicion_exacta(t, v0, a, tr, no_lineal=bool(p.get('no_lineal', False)))
+                x_steps.append(float(xv))
+                v_steps.append(float(vv))
+
         chart_fisico = {
-            'labels': [f"{t:.1f} s" for t in t_steps],
+            'labels': [f"{t:.2f} s" for t in t_steps],
             'x_label': 'Tiempo (segundos)',
-            'y_label': 'Distancia x(t) [m] y Velocidad v(t) [m/s]',
+            'y_label': 'Posición x(t) [m] y Velocidad v(t) [m/s]',
             'datasets': [
                 {
                     'label': 'Posición x(t) [m]',
@@ -625,7 +638,7 @@ def ver_simulacion(sid):
                 },
                 {
                     'label': f'Límite de Vía Libre en Estación (L = {L_lim:.1f} m)',
-                    'data': [L_lim]*len(t_steps),
+                    'data': [L_lim] * len(t_steps),
                     'borderColor': '#dc2626',
                     'borderWidth': 2,
                     'borderDash': [6, 6],
@@ -641,11 +654,11 @@ def ver_simulacion(sid):
         beta = float(p.get('beta', 0.001))
         Dumbral = float(p.get('D_umbral', 0.60))
         t_ext = float(p.get('t_exacto', 14.5))
-        
+
         t_max_plot = max(24.0, t_ext * 1.4 if np.isfinite(t_ext) else 24.0)
         t_steps = np.linspace(0, t_max_plot, 35)
-        D_steps = [float(D0 + alpha*t + beta*(t**2)) for t in t_steps]
-        
+        D_steps = [float(D0 + alpha * t + beta * (t ** 2)) for t in t_steps]
+
         chart_fisico = {
             'labels': [f"{t:.1f} m" for t in t_steps],
             'x_label': 'Tiempo acumulado (meses)',
@@ -661,7 +674,7 @@ def ver_simulacion(sid):
                 },
                 {
                     'label': f'Umbral de Inspección (D = {Dumbral:.2f})',
-                    'data': [Dumbral]*len(t_steps),
+                    'data': [Dumbral] * len(t_steps),
                     'borderColor': '#dc2626',
                     'borderWidth': 2,
                     'borderDash': [6, 6],
@@ -672,43 +685,55 @@ def ver_simulacion(sid):
         }
 
     elif cid == 3:
-        # Módulo 3: Oscilaciones por viento
-        x_max_val = float(p.get('x_max', 0.5))
-        w0 = float(p.get('w0', 2.0))
-        zeta = float(p.get('zeta', 0.05))
-        wd = w0 * np.sqrt(max(1.0 - zeta**2, 1e-6))
-        t_max = float(p.get('t_max', 15.0))
-        t_steps = np.linspace(0, t_max, 50)
-        
-        # Envolvente analítica o trayectoria simulada
-        x_env_pos = [float(x_max_val * np.exp(-zeta * w0 * t)) for t in t_steps]
-        x_env_neg = [-v for v in x_env_pos]
-        x_traj = [float(x_max_val * np.exp(-zeta * w0 * t) * np.cos(wd * t)) for t in t_steps]
-        
+        pd = p.get('plot_data')
+        if pd and 't' in pd:
+            t_steps = pd['t']
+            x_traj = pd['x_rk4']
+            x_rk2 = pd['x_rk2']
+            x_ref = pd.get('x_ref', x_traj)
+        else:
+            x_max_val = float(p.get('x_max', 0.5))
+            w0 = float(p.get('w0', 2.0))
+            zeta = float(p.get('zeta', 0.05))
+            wd = w0 * np.sqrt(max(1.0 - zeta ** 2, 1e-6))
+            t_max = float(p.get('t_max', 15.0))
+            t_steps = np.linspace(0, t_max, 50).tolist()
+            x_traj = [float(x_max_val * np.exp(-zeta * w0 * t) * np.cos(wd * t)) for t in t_steps]
+            x_rk2 = x_traj
+            x_ref = x_traj
+
         chart_fisico = {
-            'labels': [f"{t:.1f} s" for t in t_steps],
+            'labels': [f"{t:.2f} s" for t in t_steps],
             'x_label': 'Tiempo (segundos)',
-            'y_label': 'Amplitud de balanceo x(t) [metros]',
+            'y_label': 'Desplazamiento lateral x(t) [metros]',
             'datasets': [
                 {
-                    'label': 'Oscilación de Cabina x(t)',
-                    'data': x_traj,
+                    'label': 'Trayectoria RK4 [m]',
+                    'data': [float(v) for v in x_traj],
                     'borderColor': '#9333ea',
                     'borderWidth': 2.5,
                     'fill': False
                 },
                 {
-                    'label': 'Envolvente de Amortiguamiento (+/-)',
-                    'data': x_env_pos,
-                    'borderColor': '#ca8a04',
+                    'label': 'Trayectoria RK2 (Heun) [m]',
+                    'data': [float(v) for v in x_rk2],
+                    'borderColor': '#0284c7',
                     'borderWidth': 1.5,
                     'borderDash': [4, 4],
+                    'fill': False
+                },
+                {
+                    'label': 'Gálibo Seguro (+0.80 m EN 12929-1)',
+                    'data': [0.80] * len(t_steps),
+                    'borderColor': '#dc2626',
+                    'borderWidth': 2,
+                    'borderDash': [6, 6],
                     'pointRadius': 0,
                     'fill': False
                 },
                 {
-                    'label': 'Límite de seguridad lateral (+/- 1.2 m)',
-                    'data': [1.2]*len(t_steps),
+                    'label': 'Gálibo Seguro (-0.80 m)',
+                    'data': [-0.80] * len(t_steps),
                     'borderColor': '#dc2626',
                     'borderWidth': 2,
                     'borderDash': [6, 6],
@@ -719,31 +744,65 @@ def ver_simulacion(sid):
         }
 
     else:
-        # Módulo 4: Reconstrucción de Sensores
-        t_nodes = p.get('t_nodes', [0, 1, 2, 3])
-        y_nodes = p.get('y_nodes', [0, 1, 0, -1])
-        t_plot = np.linspace(min(t_nodes), max(t_nodes), 50)
-        
-        if p.get('tipo') == 'MAL_CONDICIONADO':
-            y_real = [float(1.0 / (1.0 + 25.0 * (t**2))) for t in t_plot]
+        pd = p.get('plot_data')
+        if pd and 't_plot' in pd:
+            t_plot = pd['t_plot']
+            y_real = pd['y_real']
+            y_lag = pd['y_lag']
+            y_spl = pd['y_spl']
+            t_nodes = pd['t_nodes']
+            y_nodes = pd['y_nodes']
         else:
-            y_real = [float(np.sin(t)) for t in t_plot]
-            
+            t_nodes = p.get('t_nodes', [0, 1, 2, 3])
+            y_nodes = p.get('y_nodes', [0, 1, 0, -1])
+            t_plot = np.unique(np.sort(np.concatenate([np.linspace(min(t_nodes), max(t_nodes), 50), t_nodes]))).tolist()
+            if p.get('tipo') == 'MAL_CONDICIONADO' or p.get('tipo_func') == 'runge':
+                y_real = [float(1.0 / (1.0 + 25.0 * (t ** 2))) for t in t_plot]
+            else:
+                y_real = [float(np.sin(t)) for t in t_plot]
+            y_lag = modulo4.lagrange_eval(t_nodes, y_nodes, t_plot).tolist()
+            y_spl = modulo4.splines_eval(modulo4.splines_cubicos_naturales(t_nodes, y_nodes), t_plot).tolist()
+
+        # Mapear nodos exactamente sobre t_plot
+        node_series = []
+        for tk in t_plot:
+            matches = [float(y_nodes[j]) for j, tn in enumerate(t_nodes) if abs(tk - tn) < 1e-6]
+            node_series.append(matches[0] if matches else None)
+
+        # Limitar visualmente oscilación extrema de Lagrange en Runge si supera [-3, 4] para mantener legibilidad
+        y_lag_clipped = [float(max(min(v, 4.0), -3.0)) for v in y_lag]
+
         chart_fisico = {
             'labels': [f"{t:.2f}" for t in t_plot],
             'x_label': 'Dominio Temporal t',
-            'y_label': 'Amplitud de Señal',
+            'y_label': 'Amplitud de Señal y(t)',
             'datasets': [
                 {
                     'label': 'Señal Física Real',
-                    'data': y_real,
+                    'data': [float(v) for v in y_real],
                     'borderColor': '#0284c7',
                     'borderWidth': 3,
                     'fill': False
                 },
                 {
+                    'label': 'Splines Cúbicos C² (Reconstrucción)',
+                    'data': [float(v) for v in y_spl],
+                    'borderColor': '#16a34a',
+                    'borderWidth': 2.5,
+                    'borderDash': [5, 3],
+                    'fill': False
+                },
+                {
+                    'label': 'Lagrange / Newton (Polinomio Global)',
+                    'data': y_lag_clipped,
+                    'borderColor': '#ea580c',
+                    'borderWidth': 2,
+                    'borderDash': [2, 2],
+                    'fill': False
+                },
+                {
                     'label': 'Nodos de Telemetría Muestreados',
-                    'data': [float(y_nodes[i]) if abs(t_plot[k] - t_nodes[i]) < 0.05 else None for k in range(len(t_plot)) for i in [np.argmin(np.abs(np.array(t_nodes) - t_plot[k]))]][:len(t_plot)],
+                    'data': node_series,
                     'borderColor': '#dc2626',
                     'backgroundColor': '#dc2626',
                     'pointRadius': 6,
@@ -756,7 +815,7 @@ def ver_simulacion(sid):
     max_k = 1
     datasets_error = []
     colores = ['#0284c7', '#16a34a', '#ca8a04', '#9333ea', '#dc2626', '#0d9488', '#ea580c']
-    
+
     color_idx = 0
     for ej in ejecuciones:
         iter_records = ej['iteraciones']
@@ -769,10 +828,10 @@ def ver_simulacion(sid):
                 errs.append(er_val)
             else:
                 errs.append(None)
-                
+
         if len(errs) > max_k:
             max_k = len(errs)
-            
+
         color = colores[color_idx % len(colores)]
         color_idx += 1
         datasets_error.append({
@@ -784,7 +843,7 @@ def ver_simulacion(sid):
             'pointRadius': 3,
             'fill': False
         })
-        
+
     series_error = {
         'labels': [str(k) for k in range(max_k)],
         'datasets': datasets_error
@@ -798,6 +857,7 @@ def ver_simulacion(sid):
         chart_fisico=chart_fisico,
         series_error=series_error
     )
+
 
 # ---------- Historial y Relanzamiento ----------
 
@@ -813,19 +873,34 @@ def historial():
         ).fetchall()
     return render_template('historial.html', rows=rows)
 
+
 @app.route('/relanzar/<int:sid>')
 def relanzar(sid):
     with db() as c:
         r = c.execute(
-            'SELECT e.caso_id, e.tipo FROM simulacion s '
+            'SELECT e.caso_id, e.tipo, e.parametros_json FROM simulacion s '
             'JOIN escenario e ON e.id=s.escenario_id WHERE s.id=?', (sid,)
         ).fetchone()
     if not r:
         abort(404)
-    if r['tipo'] in ('NORMAL', 'ESTRES', 'MAL_CONDICIONADO'):
-        return redirect(url_for('correr', cid=r['caso_id'], tipo=r['tipo']))
+
+    cid = r['caso_id']
+    tipo = r['tipo']
+    saved_params = json.loads(r['parametros_json']) if r['parametros_json'] else {}
+
+    if tipo in ('NORMAL', 'ESTRES', 'MAL_CONDICIONADO'):
+        params, out = _ejecutar_modulo(cid, tipo)
     else:
-        return redirect(url_for('modulo', cid=r['caso_id']))
+        params, out = _ejecutar_modulo(cid, 'PERSONALIZADO', custom=saved_params)
+
+    params['relanzada_de'] = sid
+    new_sim = _guardar_simulacion(
+        cid, tipo,
+        f"Relanzamiento verificado desde simulación #{sid}",
+        params, out
+    )
+    return redirect(url_for('ver_simulacion', sid=new_sim))
+
 
 if __name__ == '__main__':
     init()

@@ -81,8 +81,15 @@ def ejecutar(tipo, max_iter=5000):
     
     # 2. Búsqueda de raíces para el tiempo al umbral
     t_exacto, out_raices = calcular_tiempo_umbral(e['D0'], e['alpha'], e['beta'], e['D_umbral'], tol=e['tol'])
-    e['t_exacto'] = t_exacto
-    
+    e['t_exacto'] = float(t_exacto)
+    e['cond_A'] = float(cond(e['A']))
+    if len(e['b']) <= 10:
+        e['rho_j'] = float(radio_espectral_jacobi(e['A']))
+        e['rho_gs'] = float(radio_espectral_gs(e['A']))
+    else:
+        e['rho_j'] = None
+        e['rho_gs'] = None
+
     # Salida unificada: 4 métodos lineales + 3 métodos de raíces
     out = {**out_lineal, **out_raices}
     return e, out

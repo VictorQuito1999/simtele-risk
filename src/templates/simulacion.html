@@ -24,8 +24,13 @@
         📅 {{ sim.fecha }}
       </span>
       <span style="font-size: 0.82rem; color: var(--accent); font-weight: 600; background: var(--accent-light); padding: 2px 8px; border-radius: 6px;">
-        ☁️ Persistido en Turso DB
+        ☁️ Persistido en Turso DB / SQLite
       </span>
+      {% if p.get('relanzada_de') %}
+      <span style="font-size: 0.82rem; color: #15803d; font-weight: 600; background: #dcfce7; padding: 2px 8px; border-radius: 6px;">
+        🔁 Relanzada desde Simulación #{{ p.get('relanzada_de') }} (Parámetros recuperados de BD)
+      </span>
+      {% endif %}
     </div>
   </div>
 
@@ -63,6 +68,11 @@
     {% set v0_val = p.get('v0', 5.0) %}
     {% set a_val = p.get('a', 1.0) %}
     {% set tr_val = p.get('tr', 1.0) %}
+    {% set err_rk4_pct = p.get('err_rel_rk4', 0.0001) * 100 %}
+    {% set analit = p.get('analitica', {}) %}
+    {% set d_reac = analit.get('d_reaccion', v0_val * tr_val) %}
+    {% set d_fren = analit.get('d_frenado', d_tot - d_reac) %}
+    {% set tf_val = analit.get('tf', t_tot - tr_val) %}
 
     <div class="kpi-card {% if d_tot <= L_disp %}kpi-success{% else %}kpi-danger{% endif %}">
       <div class="kpi-top">
@@ -74,7 +84,7 @@
         {% if d_tot <= L_disp %}✔ Cumple Vía Libre{% else %}✘ Excede Límite Físico{% endif %}
       </div>
       <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
-        Reacción: {{ '%.2f' % (v0_val * tr_val) }} m | Frenado: {{ '%.2f' % ((v0_val**2)/(2*a_val)) }} m
+        Reacción: {{ '%.2f' % d_reac }} m | Frenado: {{ '%.2f' % d_fren }} m
       </div>
     </div>
 
@@ -96,21 +106,21 @@
         <div class="kpi-icon">⏱️</div>
       </div>
       <div class="kpi-val">{{ '%.2f' % t_tot }} <small>segundos</small></div>
-      <div class="kpi-badge kpi-badge-info">tr = {{ '%.1f' % tr_val }} s | tf = {{ '%.1f' % (v0_val / a_val) }} s</div>
+      <div class="kpi-badge kpi-badge-info">tr = {{ '%.1f' % tr_val }} s | tf = {{ '%.2f' % tf_val }} s</div>
       <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
-        Instante exacto v(t)=0 verificado por Newton
+        Instante v(t)=0 verificado con Bisección, Newton y Secante
       </div>
     </div>
 
     <div class="kpi-card kpi-success">
       <div class="kpi-top">
-        <span class="kpi-label">Precisión RK4 vs Analítica</span>
+        <span class="kpi-label">Error Relativo RK4 vs Analítica</span>
         <div class="kpi-icon">🎯</div>
       </div>
-      <div class="kpi-val">&lt; 0.05 <small>%</small></div>
-      <div class="kpi-badge kpi-badge-success">Orden O(h⁴) Global</div>
+      <div class="kpi-val">{{ '%.4f' % err_rk4_pct }} <small>%</small></div>
+      <div class="kpi-badge kpi-badge-success">Orden O(h⁴) Global · h={{ p.get('h', 0.05) }} s</div>
       <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
-        Error de truncamiento despreciable
+        {% if p.get('no_lineal') %}Modelo no lineal a(v) = a·√(v/v₀){% else %}Desaceleración constante a = {{ '%.2f' % a_val }} m/s²{% endif %}
       </div>
     </div>
 
@@ -119,6 +129,8 @@
     {% set t_ext = p.get('t_exacto', 14.5) %}
     {% set D_umb = p.get('D_umbral', 0.60) %}
     {% set D0_val = p.get('D0', 0.10) %}
+    {% set cond_a = p.get('cond_A', 2.36) %}
+    {% set new_it = p.get('newton_iters', 5) %}
 
     <div class="kpi-card {% if t_ext >= 10.0 %}kpi-success{% elif t_ext >= 5.0 %}kpi-warning{% else %}kpi-danger{% endif %}">
       <div class="kpi-top">
@@ -140,19 +152,21 @@
         <div class="kpi-icon">⚙️</div>
       </div>
       <div class="kpi-val">{{ '%.0f' % (D_umb * 100) }} <small>%</small></div>
-      <div class="kpi-badge kpi-badge-info">Deterioro Inicial: {{ '%.0f' % (D0_val * 100) }}%</div>
+      <div class="kpi-badge kpi-badge-info">Deterioro Inicial: {{ '%.1f' % (D0_val * 100) }}%</div>
       <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
         Límite admisible de pérdida de sección
       </div>
     </div>
 
-    <div class="kpi-card kpi-purple">
+    <div class="kpi-card {% if cond_a > 100 %}kpi-danger{% else %}kpi-purple{% endif %}">
       <div class="kpi-top">
         <span class="kpi-label">Condición Matriz κ(A)</span>
         <div class="kpi-icon">📐</div>
       </div>
-      <div class="kpi-val">{{ '%.2f' % p.get('cond_A', 2.36) if p.get('cond_A') else '2.36' }} <small>κ(A)</small></div>
-      <div class="kpi-badge kpi-badge-success">Estabilidad Numérica Alta</div>
+      <div class="kpi-val">{% if cond_a > 100 %}{{ '%.2e' % cond_a }}{% else %}{{ '%.2f' % cond_a }}{% endif %} <small>κ(A)</small></div>
+      <div class="kpi-badge {% if cond_a > 100 %}kpi-badge-danger{% else %}kpi-badge-success{% endif %}">
+        {% if cond_a > 100 %}⚠️ Problema Mal Condicionado{% else %}✔ Estabilidad Numérica Alta{% endif %}
+      </div>
       <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
         Cota de sensibilidad: ‖δx‖/‖x‖ ≤ κ ‖δb‖/‖b‖
       </div>
@@ -164,9 +178,9 @@
         <div class="kpi-icon">⚡</div>
       </div>
       <div class="kpi-val">Newton <small>p=2</small></div>
-      <div class="kpi-badge kpi-badge-success">5 iter · Tol 10⁻⁸</div>
+      <div class="kpi-badge kpi-badge-success">{{ new_it }} iter · Tol {{ '%.0e' % p.get('tol', 1e-8) }}</div>
       <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
-        Convergencia cuadrática acelerada
+        Matriz n={{ p.get('n', 4) }}×{{ p.get('n', 4) }} | Perturbación δb={{ '%.1f' % (p.get('perturbacion', 0)*100) }}%
       </div>
     </div>
 
@@ -230,6 +244,7 @@
   {% else %}
     <!-- CASO 4: SENSORES Y TELEMETRÍA -->
     {% set err_spl = p.get('err_rel_spl', 0.001) %}
+    {% set err_lag = p.get('err_rel_lag', 0.001) %}
     {% set n_nodes = p.get('n_nodos', 10) %}
     {% set ruido = p.get('ruido_sigma', 0.0) %}
 
@@ -257,17 +272,17 @@
       </div>
     </div>
 
-    <div class="kpi-card {% if sim.tipo == 'MAL_CONDICIONADO' %}kpi-danger{% else %}kpi-purple{% endif %}">
+    <div class="kpi-card {% if err_lag > 0.5 %}kpi-danger{% else %}kpi-purple{% endif %}">
       <div class="kpi-top">
-        <span class="kpi-label">Fenómeno de Runge</span>
+        <span class="kpi-label">Error Lagrange / Newton</span>
         <div class="kpi-icon">⚠️</div>
       </div>
-      <div class="kpi-val">{% if sim.tipo == 'MAL_CONDICIONADO' %}&gt; 1000 <small>% err</small>{% else %}Mitigado{% endif %}</div>
-      <div class="kpi-badge {% if sim.tipo == 'MAL_CONDICIONADO' %}kpi-badge-danger{% else %}kpi-badge-success{% endif %}">
-        Lagrange / Newton Divergencia
+      <div class="kpi-val">{{ '%.2f' % (err_lag * 100) }} <small>%</small></div>
+      <div class="kpi-badge {% if err_lag > 0.5 %}kpi-badge-danger{% else %}kpi-badge-success{% endif %}">
+        {% if err_lag > 0.5 %}Fenómeno de Runge Activo{% else %}Polinomio Global Estable{% endif %}
       </div>
       <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
-        Splines Cúbicos inmunes a la explosión
+        Splines Cúbicos mantienen {{ '%.2f' % (err_spl * 100) }}% de error
       </div>
     </div>
 
@@ -614,24 +629,48 @@
     </div>
     <div style="font-size: 0.92rem; color: var(--text); line-height: 1.75;">
       {% if sim.caso_id == 2 %}
+        {% set cond_a = p.get('cond_A', 2.36) %}
+        {% set t_ext = p.get('t_exacto', 14.5) %}
         {% if sim.tipo == 'NORMAL' %}
-          <p>• <b>Sistemas Lineales:</b> La matriz tridiagonal es estrictamente diagonal dominante y simétrica definida positiva ($\kappa = 2.36$). El radio espectral $\rho(T_J) = 0.4045 < 1$ garantiza la convergencia lineal de Jacobi (21 iteraciones). Gauss-Seidel converge en casi la mitad de pasos (12 iteraciones) debido a que $\rho(T_{GS}) \approx (\rho_J)^2 = 0.1636$. LU y Gradiente Conjugado alcanzan precisión de máquina ($10^{-16}$) en 1 y 4 pasos respectivamente.</p>
-          <p style="margin-top: 8px;">• <b>Búsqueda de Raíces:</b> Newton-Raphson exhibe convergencia cuadrática ($p=2$), alcanzando tolerancia $10^{-8}$ en solo 5 iteraciones ($E_r \sim 10^{-13}$). Secante converge superlinealmente ($p \approx 1.618$) en 7 iteraciones. Bisección requiere 27 iteraciones pero ofrece garantía de convergencia monótona.</p>
+          <p>• <b>Sistemas Lineales:</b> La matriz tridiagonal ($n={{ p.get('n', 4) }}$) es estrictamente diagonal dominante y SPD ($\kappa = {{ '%.2f' % cond_a }}$). El radio espectral $\rho(T_J) = 0.4045 &lt; 1$ garantiza la convergencia lineal de Jacobi (21 iteraciones), mientras Gauss-Seidel converge en 12 pasos ($\rho(T_{GS}) \approx \rho_J^2 = 0.1636$). LU y Gradiente Conjugado alcanzan precisión de máquina ($10^{-16}$).</p>
+          <p style="margin-top: 8px;">• <b>Búsqueda de Raíces:</b> Newton-Raphson exhibe convergencia cuadrática ($p=2$), alcanzando tolerancia $10^{-8}$ en {{ p.get('newton_iters', 5) }} iteraciones. Secante converge superlinealmente ($p \approx 1.618$) y Bisección ofrece convergencia monótona garantizada.</p>
         {% elif sim.tipo == 'ESTRES' %}
-          <p>• <b>Sensibilidad ante Perturbaciones:</b> Todos los métodos de calibración lineal convergen con residuos diminutos ($< 10^{-11}$), pero todos tienen un error relativo del $1.06\%$ respecto a $x^*$. Se demuestra que el error final proviene de la perturbación del 3% en los datos de entrada ($\delta b$), no de limitaciones del algoritmo.</p>
-          <p style="margin-top: 8px;">• <b>Raíces bajo Fatiga:</b> Los tres métodos de raíces calculan el nuevo tiempo al umbral ($6.06\text{ meses}$) de forma estable sin degradación numérica.</p>
+          <p>• <b>Sensibilidad ante Perturbaciones:</b> En dimensión alta ($n={{ p.get('n', 50) }}$) con perturbación del $3\%$ en el vector de carga ($\delta b$), todos los métodos lineales convergen con residuo $\approx 10^{-11}$, pero mantienen un error relativo de $\sim 1.06\%$ frente a $x^*$. Se comprueba que el error proviene de la perturbación en los datos ($\|\delta x\|/\|x\| \le \kappa \|\delta b\|/\|b\|$), no de imprecisión algorítmica.</p>
+          <p style="margin-top: 8px;">• <b>Raíces bajo Fatiga:</b> Bisección, Newton y Secante convergen de manera estable a $t^* = {{ '%.2f' % t_ext }}\text{ meses}$.</p>
+        {% elif sim.tipo == 'MAL_CONDICIONADO' %}
+          <p>• <b>Mal Condicionamiento vs. Falta de Convergencia:</b> Para la matriz de Hilbert ($\kappa = {{ '%.2e' % cond_a }}$), Jacobi <b>diverge exponencialmente</b> por $\rho(T_J) = 2.5821 &gt; 1$ (fallo del algoritmo) y Gauss-Seidel se estanca en 5000 pasos por $\rho(T_{GS}) = 0.9990 \approx 1$. En cambio, LU y Gradiente Conjugado resuelven el sistema con residuo nulo, pero la perturbación $10^{-6}$ en $b$ se amplifica hasta $E_r \approx 1.92 \times 10^{-3}$ por el alto $\kappa(A)$.</p>
+          <p style="margin-top: 8px;">• <b>Raíz Cuasi-Múltiple:</b> Con $D'(t^*) \to 0$, Newton pierde su tasa cuadrática pero conserva convergencia hacia $t^* = {{ '%.2f' % t_ext }}\text{ meses}$.</p>
         {% else %}
-          <p>• <b>Mal Condicionamiento vs. Divergencia:</b> Para la matriz de Hilbert ($\kappa \approx 1.55 \times 10^4$), Jacobi diverge exponencialmente por tener $\rho(T_J) = 2.5821 > 1$. Gauss-Seidel se estanca debido a que $\rho(T_{GS}) = 0.9990 \approx 1$. Por el contrario, LU y CG resuelven con residuo cero pero su error relativo se amplifica a $1.92 \times 10^{-3}$ por el número de condición ($\kappa$). Se comprueba estrictamente la cota de sensibilidad.</p>
+          <p>• <b>Evaluación Personalizada:</b> El sistema lineal ($n={{ p.get('n', 4) }}, \kappa={{ '%.2f' % cond_a }}$) y la ecuación $D(t)-D_{\text{umbral}}=0$ ($t^* = {{ '%.2f' % t_ext }}\text{ meses}$) se resolvieron consistentemente verificando convergencia cuadrática en Newton frente a lineal en Bisección.</p>
         {% endif %}
       {% elif sim.caso_id == 1 %}
-        <p>• <b>Comparación EDO RK2 vs. RK4:</b> Runge-Kutta 4to orden exhibe un error de truncamiento global de orden $O(h^4)$, reproduciendo la distancia analítica de frenado con un error menor al $0.05\%$. RK2 (Heun), de orden $O(h^2)$, presenta una acumulación de error mayor pero con la mitad del costo de evaluaciones funcionales por paso.</p>
-        <p style="margin-top: 8px;">• <b>Integración Numérica y Raíces:</b> El método del Trapecio reproduce con fidelidad la integral de velocidad $\int v(t) dt$, mientras que la búsqueda de raíces (Newton-Raphson) localiza el instante exacto de detención $v(t)=0$ en 4 iteraciones con precisión de máquina.</p>
+        {% set err_rk4_pct = p.get('err_rel_rk4', 0.0) * 100 %}
+        {% set err_rk2_pct = p.get('err_rel_rk2', 0.0) * 100 %}
+        {% if sim.tipo == 'MAL_CONDICIONADO' or p.get('no_lineal') %}
+          <p>• <b>EDO No Lineal y Raíz Tangencial:</b> Bajo desaceleración dependiente de velocidad $a(v) = a\sqrt{v/v_0}$, RK4 ($O(h^4)$) obtiene $d={{ '%.3f' % p.get('d_rk4', p.get('d_total', 0)) }}\text{ m}$ con error relativo de <b>{{ '%.4f' % err_rk4_pct }}%</b> frente a la solución analítica no lineal ($d={{ '%.3f' % p.get('d_total', 0) }}\text{ m}$), superando a RK2 ({{ '%.4f' % err_rk2_pct }}%). En la búsqueda de $v(t)=0$, la multiplicidad doble en la parada ($v'(t^*)=0$) degrada la convergencia cuadrática de Newton a lineal, demostrando sensibilidad numérica sin divergencia.</p>
+        {% else %}
+          <p>• <b>Comparación EDO RK2 vs. RK4 (Escenario {{ sim.tipo }}):</b> Con paso $h={{ p.get('h', 0.05) }}\text{ s}$, RK4 alcanza una precisión de <b>{{ '%.4f' % err_rk4_pct }}%</b> frente a la referencia analítica ($d={{ '%.2f' % p.get('d_total', 17.5) }}\text{ m}$, $t={{ '%.2f' % p.get('t_total', 6.0) }}\text{ s}$), mientras que RK2 (Heun) presenta orden $O(h^2)$ con error de {{ '%.4f' % err_rk2_pct }}%.</p>
+        {% endif %}
+        <p style="margin-top: 8px;">• <b>Integración y Raíces:</b> El refinamiento de Trapecio ($O(h^2)$) y Simpson 1/3 ($O(h^4)$) sobre $v(t)$ reproduce la distancia total de frenado, y Bisección/Newton/Secante coinciden en el instante $v(t)=0$ dentro de tolerancia $10^{-8}$.</p>
       {% elif sim.caso_id == 3 %}
-        <p>• <b>Resolución EDO (RK4 vs. RK2 Heun):</b> Runge-Kutta 4to orden mantiene estabilidad estricta en régimen subamortiguado y resonante, logrando un error local $O(h^5)$ y global $O(h^4)$ que evita la dispersión artificial de fase. RK2 exhibe ligeras desviaciones de amplitud máxima acumuladas tras 15 segundos de simulación.</p>
-        <p style="margin-top: 8px;">• <b>Integración de Energía Acumulada $\int x^2 dt$:</b> Romberg (extrapolación de Richardson de orden $h^6$) converge rápidamente al valor exacto de disipación energética, mientras que Simpson 1/3 compuesto mejora drásticamente la aproximación de Trapecio con idéntico número de evaluaciones.</p>
+        {% set err_rk4_pct = p.get('err_rel_rk4', 0.0) * 100 %}
+        {% set err_rk2_pct = p.get('err_rel_rk2', 0.0) * 100 %}
+        {% if sim.tipo == 'NORMAL' %}
+          <p>• <b>Validación Analítica Subamortiguada:</b> En vibración libre ($F_0=0, \zeta={{ '%.3f' % p.get('zeta', 0.05) }}$), RK4 reproduce la solución cerrada exponencial-trigonométrica con error relativo máximo de <b>{{ '%.4f' % err_rk4_pct }}%</b>, frente a <b>{{ '%.4f' % err_rk2_pct }}%</b> en RK2 (Heun).</p>
+        {% else %}
+          <p>• <b>Estabilidad en Régimen Forzado / Resonante ({{ sim.tipo }}):</b> Al excitar el oscilador con $F_0={{ '%.0f' % p.get('F0', 0) }}\text{ N}$ a $\omega_f={{ '%.2f' % p.get('omega_f', 0) }}\text{ rad/s}$ (cerca de $\omega_0={{ '%.2f' % p.get('w0', 2.0) }}\text{ rad/s}$), RK2 acumula error de fase y amplitud ({{ '%.4f' % err_rk2_pct }}%) respecto a la referencia de alta resolución, mientras RK4 mantiene error de {{ '%.4f' % err_rk4_pct }}%.</p>
+        {% endif %}
+        <p style="margin-top: 8px;">• <b>Integración de Energía $\int x^2 dt$:</b> Romberg (extrapolación de Richardson) converge al valor de referencia energética con menor número de evaluaciones que Trapecio compuesto ($O(h^2)$) y mejora progresiva de Simpson 1/3 ($O(h^4)$).</p>
       {% elif sim.caso_id == 4 %}
-        <p>• <b>Análisis de Interpolación y Fenómeno de Runge:</b> Para la función de prueba $f(t) = 1/(1+25t^2)$ con nodos equiespaciados, los polinomios globales de Lagrange y Newton divergen catastróficamente en los extremos del dominio con errores superiores al 1000% debido a la explosión de la derivada de orden superior.</p>
-        <p style="margin-top: 8px;">• <b>Estabilidad de Splines Cúbicos:</b> Los Splines cúbicos naturales garantizan suavidad $C^2$ resolviendo un sistema tridiagonal estrictamente diagonal dominante ($O(n)$ operaciones), logrando un error relativo despreciable ($< 0.2\%$) sin oscilaciones parásitas.</p>
+        {% set err_lag_pct = p.get('err_rel_lag', 0.0) * 100 %}
+        {% set err_spl_pct = p.get('err_rel_spl', 0.0) * 100 %}
+        {% if sim.tipo == 'MAL_CONDICIONADO' or p.get('tipo_func') == 'runge' %}
+          <p>• <b>Demostración del Fenómeno de Runge:</b> Con {{ p.get('n_nodos', 14) }} nodos equiespaciados sobre $f(t)=1/(1+25t^2)$, los polinomios globales de Lagrange y Newton amplifican oscilaciones en los bordes generando un error relativo medio de <b>{{ '%.2f' % err_lag_pct }}%</b>. Los <b>Splines Cúbicos Naturales ($C^2$)</b> resuelven un sistema tridiagonal diagonal dominante y acotan el error a apenas <b>{{ '%.3f' % err_spl_pct }}%</b>.</p>
+        {% elif sim.tipo == 'ESTRES' or p.get('ruido_sigma', 0) > 0 %}
+          <p>• <b>Sensibilidad ante Ruido y Pérdida de Datos:</b> Ante un gap de telemetría y ruido gaussiano ($\sigma={{ '%.2f' % p.get('ruido_sigma', 0.08) }}$), el polinomio global de Lagrange/Newton presenta un error de <b>{{ '%.2f' % err_lag_pct }}%</b> por sobreajuste de ruido, mientras que los Splines Cúbicos mantienen mayor estabilidad local (<b>{{ '%.2f' % err_spl_pct }}%</b>).</p>
+        {% else %}
+          <p>• <b>Interpolación Nominal sin Ruido:</b> Sobre la señal armónica $y(t)=\sin(t)$ con {{ p.get('n_nodos', 10) }} nodos equiespaciados, Lagrange, Newton y Splines Cúbicos reconstruyen los puntos ocultados con alta precisión (error Lagrange/Newton: <b>{{ '%.4f' % err_lag_pct }}%</b>, Splines: <b>{{ '%.4f' % err_spl_pct }}%</b>).</p>
+        {% endif %}
       {% endif %}
     </div>
   </div>
@@ -647,24 +686,44 @@
     </div>
     <div style="font-size: 0.92rem; color: var(--text); line-height: 1.75;">
       {% if sim.caso_id == 2 %}
+        {% set t_ext = p.get('t_exacto', 14.5) %}
         {% if sim.tipo == 'NORMAL' %}
-          <p>• <b>Planificación de Mantenimiento Preventivo:</b> El componente crítico (cable tractor-portador de acero torsionado) alcanzará el umbral normativo del 60% de desgaste a los <b>14.49 meses</b> de operación ininterrumpida. Esto otorga al departamento de mantenimiento un horizonte seguro de 1 año y 2 meses para planificar la inspección no destructiva (END).</p>
-          <p style="margin-top: 8px;">• <b>Recomendación Operativa:</b> Programar la primera ronda de ensayos electromagnéticos a los 10 meses para verificar la tasa real de microfisuración en alambres externos.</p>
+          <p>• <b>Planificación de Mantenimiento Preventivo:</b> El cable tractor-portador alcanzará el umbral normativo del {{ '%.0f' % (p.get('D_umbral', 0.6)*100) }}% de desgaste a los <b>{{ '%.2f' % t_ext }} meses</b> de operación regular, brindando margen seguro para programar ensayos electromagnéticos no destructivos (END).</p>
         {% elif sim.tipo == 'ESTRES' %}
-          <p>• <b>Impacto de la Fatiga Severa y Altitud:</b> Bajo condiciones ambientales extremas de La Paz y retraso en la lubricación ($\alpha = 0.05, \beta = 0.004$), el tiempo hasta el umbral se reduce drásticamente de 14.5 a <b>6.06 meses</b> (una reducción de más del 58% de la vida útil).</p>
-          <p style="margin-top: 8px;">• <b>Acción Inmediata:</b> Requiere duplicar la frecuencia de lubricación e inspección visual en balancines de torres de alta carga.</p>
+          <p>• <b>Impacto de Fatiga Severa y Altitud:</b> Con carga severa y lubricación retrasada, la vida útil remanente cae a <b>{{ '%.2f' % t_ext }} meses</b> (reducción mayor al 58%), exigiendo duplicar la frecuencia de lubricación e inspección en balancines.</p>
+        {% elif sim.tipo == 'MAL_CONDICIONADO' %}
+          <p>• <b>Incertidumbre en Calibración de Sensores:</b> Si la matriz de calibración está mal condicionada ($\kappa \gg 1$), pequeños errores de lectura producen estimaciones distorsionadas del desgaste. Se requiere calibración directa con patrones físicos certificados.</p>
         {% else %}
-          <p>• <b>Incertidumbre en Sensores de Desgaste:</b> Demuestra que si la calibración de sensores está mal condicionada ($\kappa$ alto), los reportes de telemetría pueden generar falsas alarmas o enmascarar desgaste real. Es imperativo calibrar contra estándares físicos de laboratorio.</p>
+          <p>• <b>Pronóstico Personalizado de Activo:</b> Con los parámetros ingresados, el umbral de inspección $D={{ '%.2f' % p.get('D_umbral', 0.6) }}$ se alcanza en <b>{{ '%.2f' % t_ext }} meses</b>. {% if t_ext < 6 %}Se recomienda intervención preventiva inmediata.{% else %}Ventana operativa adecuada para mantenimiento programado.{% endif %}</p>
         {% endif %}
       {% elif sim.caso_id == 1 %}
-        <p>• <b>Margen de Seguridad en Estación:</b> Para la velocidad nominal de $5.0\text{ m/s}$ y desaceleración de $1.0\text{ m/s}^2$ con 1 segundo de reacción, la cabina se detiene completamente a los $17.50\text{ metros}$, cumpliendo con holgura la vía libre disponible de $20.0\text{ metros}$ con un margen de seguridad de $2.50\text{ metros}$.</p>
-        <p style="margin-top: 8px;">• <b>Límite Operativo:</b> Si la velocidad supera los $5.5\text{ m/s}$ o el tiempo de reacción excede $1.5\text{ s}$, la cabina colisionaría con la estación, exigiendo un sistema de parada redundante.</p>
+        {% set d_tot = p.get('d_total', 17.5) %}
+        {% set L_disp = p.get('L', 20.0) %}
+        {% if d_tot <= L_disp %}
+          <p>• <b>Cumplimiento de Vía Libre en Estación:</b> Con $v_0={{ '%.1f' % p.get('v0', 5.0) }}\text{ m/s}$ y $t_r={{ '%.1f' % p.get('tr', 1.0) }}\text{ s}$, la cabina se detiene en <b>{{ '%.2f' % d_tot }} m</b> (en {{ '%.2f' % p.get('t_total', 6.0) }} s), cumpliendo la distancia disponible de <b>{{ '%.1f' % L_disp }} m</b> con un margen de seguridad de <b>{{ '%.2f' % (L_disp - d_tot) }} m</b> según EN 12929-1.</p>
+        {% else %}
+          <p>• <b>Alerta Crítica de Colisión en Estación:</b> La distancia requerida de <b>{{ '%.2f' % d_tot }} m</b> excede la vía libre disponible ({{ '%.1f' % L_disp }} m) en <b>{{ '%.2f' % (d_tot - L_disp) }} m</b>. Operativamente implica riesgo de rebase del andén, exigiendo reducción previa de velocidad al aproximarse a estación o frenado de emergencia redundante.</p>
+        {% endif %}
+        <p style="margin-top: 8px;">• <b>Alcance del Modelo:</b> El modelo asume línea horizontal sin gradiente gravitacional ni deslizamiento cable-polea.</p>
       {% elif sim.caso_id == 3 %}
-        <p>• <b>Seguridad ante Ráfagas de Viento en Cañones:</b> En operación normal libre, el amortiguamiento pendular contiene el balanceo dentro de límites confortables ($< 0.50\text{ m}$). Sin embargo, ante ráfagas resonantes a frecuencia propia ($\omega_0 = 2.0\text{ rad/s}$), la cabina supera el gálibo seguro de 0.80 m hacia las estructuras de torre.</p>
-        <p style="margin-top: 8px;">• <b>Protocolo SCADA:</b> La cuantificación de la energía integrada acumulada en tiempo real permite disparar la ralentización preventiva del sistema a 2.0 m/s antes de que se alcance la condición crítica de descarrilamiento.</p>
+        {% set xmax = p.get('x_max', 0.5) %}
+        {% if xmax > 0.80 %}
+          <p>• <b>Exceso de Gálibo Lateral (Riesgo Crítico):</b> La amplitud máxima de balanceo alcanza <b>{{ '%.3f' % xmax }} m</b>, superando el límite admisible de <b>0.80 m</b> respecto a las torres (EN 12929-1). En operación real obligaría a reducir velocidad a 2.0 m/s o detener preventivamente la línea mediante protocolo SCADA.</p>
+        {% elif xmax > 0.50 %}
+          <p>• <b>Alerta Preventiva de Viento Lateral:</b> La cabina oscila hasta <b>{{ '%.3f' % xmax }} m</b>; aunque permanece bajo el gálibo de 0.80 m, requiere vigilancia continua de anemómetros de torre.</p>
+        {% else %}
+          <p>• <b>Operación Confortable y Segura:</b> La oscilación máxima de <b>{{ '%.3f' % xmax }} m</b> se amortigua rápidamente dentro del gálibo seguro (0.80 m), demostrando estabilidad aerodinámica en condiciones nominales.</p>
+        {% endif %}
+        <p style="margin-top: 8px;">• <b>Límite Físico:</b> No incluye acoplamiento torsional del cable ni ráfagas turbulentas estocásticas 3D.</p>
       {% elif sim.caso_id == 4 %}
-        <p>• <b>Confiabilidad en Sensores de Cable y Poleas:</b> Si la telemetría del teleférico pierde paquetes o sufre interferencia electromagnética, reconstruir los datos con polinomios globales provocaría falsos disparos de sobretensión o subestimación del desgaste de las zapatas.</p>
-        <p style="margin-top: 8px;">• <b>Adopción de Splines en el Sistema de Control:</b> Los splines cúbicos permiten interpolar de manera robusta y en tiempo real las tensiones de línea, garantizando que el sistema automático de supervisión reciba señales físicamente admisibles y suaves ($C^2$).</p>
+        {% set err_spl_pct = p.get('err_rel_spl', 0.0) * 100 %}
+        {% if sim.tipo == 'MAL_CONDICIONADO' or p.get('tipo_func') == 'runge' %}
+          <p>• <b>Prevención de Falsas Alarmas en Telemetría:</b> Reconstruir picos bruscos de tensión con polinomios globales generaría falsos disparos de sobrecarga en los bordes de la ventana temporal. Los <b>Splines Cúbicos ($C^2$)</b> reconstruyen la señal con error de {{ '%.3f' % err_spl_pct }}%, preservando decisiones confiables en supervisión.</p>
+        {% elif sim.tipo == 'ESTRES' or p.get('ruido_sigma', 0) > 0 %}
+          <p>• <b>Impacto de Pérdida de Paquetes y Ruido:</b> Con pérdida de telemetría y ruido $\sigma={{ '%.2f' % p.get('ruido_sigma', 0) }}$, la reconstrucción presenta incertidumbre (error Splines {{ '%.2f' % err_spl_pct }}%), indicando que los gaps prolongados requieren redundancia de sensores físicos y filtrado previo antes de interpolar.</p>
+        {% else %}
+          <p>• <b>Integridad de Monitoreo Continuo:</b> Ante micro-cortes de muestreo en sensores limpios, la interpolación con Splines Cúbicos recupera la señal de tensión/velocidad con fidelidad prácticamente exacta ({{ '%.4f' % err_spl_pct }}%), evitando interrupciones innecesarias del servicio.</p>
+        {% endif %}
       {% endif %}
     </div>
   </div>

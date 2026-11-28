@@ -26,7 +26,7 @@
     </div>
     <div style="text-align: right;">
       <span class="badge {% if caso.activo %}badge-normal{% else %}badge-estres{% endif %}">
-        {% if caso.activo %}Implementado S1/S2{% else %}Formulación Teórica S2{% endif %}
+        {% if caso.activo %}Validado S3 (3 Escenarios){% else %}Formulación Teórica{% endif %}
       </span>
     </div>
   </div>
@@ -141,7 +141,7 @@
       <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1rem;">
         $$\frac{dx}{dt} = v, \quad \frac{dv}{dt} = -a(v, t), \quad \text{con } x(0) = 0, \ v(0) = v_0$$
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
-          Resuelto mediante <b>Runge-Kutta de 2do orden (Heun)</b> y <b>Runge-Kutta de 4to orden (RK4)</b>, integrando $v(t)$ con <b>Trapecio compuesto</b> y encontrando el instante de detención $v(t)=0$ con <b>Bisección, Newton y Secante</b>.
+          Resuelto mediante <b>Runge-Kutta de 2do orden (Heun)</b> y <b>Runge-Kutta de 4to orden (RK4)</b>, integrando $v(t)$ con <b>Trapecio compuesto</b> y <b>Simpson 1/3 compuesto</b>, y encontrando el instante de detención $v(t)=0$ con <b>Bisección, Newton y Secante</b>.
         </p>
       </div>
 

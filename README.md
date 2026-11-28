@@ -8,8 +8,8 @@
 
 ## 🚀 Características Principales del Sistema
 
-1. **4 Módulos de Estudio Integrados Funcional y Visualmente:**
-   - **Módulo 1: Detención de Emergencia de Cabinas:** Resolución del sistema de EDO de movimiento y frenado con desaceleración zapatas mediante **Heun (RK2)** y **Runge-Kutta de 4to Orden (RK4)**; integración compuesta por **Trapecio**; localización del instante de parada mediante **Newton-Raphson**; evaluación del margen de seguridad respecto a la vía libre disponible ($L - d_{\text{total}} \ge 0$).
+1. **4 Módulos de Estudio Integrados Funcional y Visualmente (Validados Semana 3):**
+   - **Módulo 1: Detención de Emergencia de Cabinas:** Resolución del sistema de EDO de movimiento y frenado con desaceleración mediante **Heun (RK2)** y **Runge-Kutta de 4to Orden (RK4)**; integración compuesta por **Trapecio** y **Simpson 1/3**; localización del instante de parada $v(t)=0$ mediante **Bisección**, **Newton-Raphson** y **Secante**; evaluación del margen de seguridad respecto a la vía libre disponible ($L - d_{\text{total}} \ge 0$).
    - **Módulo 2: Deterioro Mecánico y Mantenimiento:** Calibración de parámetros mediante sistemas de ecuaciones lineales $Ax=b$ con **Jacobi**, **Gauss-Seidel**, **Descomposición LU** ($PA=LU$) y **Gradiente Conjugado** sobre matrices simétricas definidas positivas; estimación del tiempo al umbral normativo ($D(t) - D_{\text{umbral}} = 0$) con **Bisección**, **Newton-Raphson** y **Secante**.
    - **Módulo 3: Oscilaciones Transversales por Viento:** Dinámica de balanceo pendular en vano abierto $m \ddot{x} + c \dot{x} + k x = F(t)$ bajo régimen subamortiguado libre (contrastado contra solución analítica exacta) y régimen forzado resonante con ráfagas laterales; integración de energía de oscilación $\int x^2 dt$ mediante **Trapecio**, **Simpson 1/3** y **Romberg** (extrapolación de Richardson).
    - **Módulo 4: Reconstrucción de Telemetría de Sensores:** Reconstrucción de registros faltantes en galgas extensométricas de tensión de cable y tacómetros de polea mediante **Interpolación de Lagrange**, **Polinomio de Newton por Diferencias Divididas** y **Splines Cúbicos Naturales ($C^2$)**; demostración empírica del **Fenómeno de Runge** y sensibilidad ante ruido gaussiano.
@@ -130,12 +130,12 @@ print('Verificación de módulos exitosa.')
 
 ---
 
-## ☁️ Despliegue en la Nube (Producción)
+## ☁️ Despliegue en la Nube (Producción: Vercel + Turso LibSQL)
 
-El proyecto incluye soporte nativo para despliegue en plataformas PaaS como **Render** o **Railway**:
-- **Comando de Build:** `pip install -r requirements.txt`
-- **Comando de Start:** `gunicorn --chdir src app:app`
-- **Variables de Entorno:** `PORT=5000` (asignado automáticamente por el proveedor).
+La aplicación se encuentra desplegada en producción sobre **Vercel Serverless Functions** (`vercel.json`) conectada a **Turso (LibSQL)** mediante `src/db_adapter.py` (con pipelines HTTP agrupados) y respaldo local automático en `simtele.db` (SQLite) cuando no existen variables de entorno de Turso:
+- **URL en Producción:** `https://simtele-risk.vercel.app/`
+- **Variables de Entorno en Vercel:** `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `SECRET_KEY` (ver `.env.example`).
+- **Despliegue alternativo PaaS (Render/Railway):** `gunicorn --chdir src app:app` (`Procfile`, `render.yaml`).
 
 ---
 
@@ -143,10 +143,10 @@ El proyecto incluye soporte nativo para despliegue en plataformas PaaS como **Re
 
 | Caso de Estudio | Escenario NORMAL | Escenario ESTRÉS | Escenario MAL CONDICIONADO |
 | :--- | :--- | :--- | :--- |
-| **Módulo 1: Detención de Emergencia** | $v_0 = 5.0\text{ m/s}, a = 1.0\text{ m/s}^2, t_r = 1.0\text{ s}$. Cumple vía libre ($d = 17.5\text{ m} \le 20\text{ m}$). | $v_0 = 6.0\text{ m/s}, a = 0.65\text{ m/s}^2, t_r = 1.5\text{ s}$. Frenado degradado con riesgo de choque ($d = 36.7\text{ m} > 25\text{ m}$). | Desaceleración variable no lineal $a(v) = 0.2 + 0.15 v^2$. Contraste de paso $h$ y divergencia en aproximaciones de orden bajo. |
-| **Módulo 2: Deterioro y Mantenimiento** | Matriz tridiagonal SPD $4\times 4$ ($\kappa = 2.36$). Convergencia lineal de Jacobi ($\rho = 0.4045$) y superlineal de raíces ($t^* = 14.49\text{ meses}$). | Perturbación del 3% en vector de carga ($\delta b$). Análisis de sensibilidad y reducción drástica de vida útil ($t^* = 6.06\text{ meses}$). | Matriz de Hilbert $4\times 4$ ($\kappa \approx 1.55 \times 10^4$). Jacobi diverge ($\rho = 2.5821 > 1$), Gauss-Seidel se estanca ($\rho \approx 0.999$). |
-| **Módulo 3: Oscilaciones por Viento** | Vibración libre subamortiguada ($F_0 = 0$). Contraste contra solución analítica exponencial decreciente ($E_r < 10^{-4}$). | Ráfaga oscilatoria periódica $F_0 = 1500\text{ N}$ cercana a resonancia ($\omega_f = 1.90\text{ rad/s}$). Amplitud crece a $0.72\text{ m}$. | Resonancia pura ($\omega_f = \omega_0 = 2.0\text{ rad/s}$) y amortiguamiento crítico casi nulo ($\zeta \approx 0.0005$). Amplitud excede el gálibo lateral de 0.80 m. |
-| **Módulo 4: Reconstrucción de Sensores** | Señal armónica $y(t) = \sin(t)$, 10 nodos equiespaciados sin ruido. Error en Splines y Newton $< 10^{-3}$. | Gap central del 40% de telemetría perdida y ruido gaussiano $\sigma = 0.08$. Reconstrucción interpolada con Splines $C^2$. | **Fenómeno de Runge:** $f(t) = \frac{1}{1 + 25t^2}$ con 14 nodos. Lagrange y Newton explotan en bordes ($E_r = 1140\%$), Splines mantienen $E_r = 0.19\%$. |
+| **Módulo 1: Detención de Emergencia** | $v_0 = 5.0\text{ m/s}, a = 1.0\text{ m/s}^2, t_r = 1.0\text{ s}$. Cumple vía libre ($d = 17.50\text{ m} \le 20.0\text{ m}$). | $v_0 = 7.0\text{ m/s}, a = 0.70\text{ m/s}^2, t_r = 2.0\text{ s}$. Frenado degradado con riesgo de colisión ($d = 49.00\text{ m} > 25.0\text{ m}$). | Desaceleración variable no lineal $a(v) = a\sqrt{v/v_0}$ ($v_0=5.0, a=0.8$). $d_{\text{total}} = 25.83\text{ m} > 25.0\text{ m}$ y raíz tangencial doble ($v'(t^*)=0$) que degrada Newton a orden lineal. |
+| **Módulo 2: Deterioro y Mantenimiento** | Matriz tridiagonal SPD $4\times 4$ ($\kappa = 2.36$). Convergencia lineal de Jacobi ($\rho = 0.4045$) y superlineal/cuadrática de raíces ($t^* = 14.49\text{ meses}$). | Matriz $50\times 50$ con perturbación del 3% ($\delta b$). Análisis de sensibilidad ($E_r \approx 1.06\%$) y reducción de vida útil ($t^* = 6.06\text{ meses}$). | Matriz de Hilbert $4\times 4$ ($\kappa \approx 1.55 \times 10^4$). Jacobi diverge ($\rho = 2.5821 > 1$), Gauss-Seidel se estanca ($\rho \approx 0.9990$), LU y CG amplifican error por $\kappa$. |
+| **Módulo 3: Oscilaciones por Viento** | Vibración libre subamortiguada ($F_0 = 0$). Contraste contra solución analítica exponencial decreciente ($E_r < 10^{-5}$). | Ráfaga oscilatoria periódica $F_0 = 1500\text{ N}$ cercana a resonancia ($\omega_f = 1.90\text{ rad/s}$). Amplitud crece a $0.963\text{ m} > 0.80\text{ m}$. | Resonancia pura ($\omega_f = \omega_0 = 2.0\text{ rad/s}$) y amortiguamiento casi nulo ($\zeta \approx 0.0005$). Amplitud crece a $2.005\text{ m}$, excediendo ampliamente el gálibo de 0.80 m. |
+| **Módulo 4: Reconstrucción de Sensores** | Señal armónica $y(t) = \sin(t)$, 10 nodos equiespaciados sin ruido. Error $< 0.005\%$. | Gap central de datos perdidos y ruido gaussiano $\sigma = 0.08$. Comparación de estabilidad entre Splines $C^2$ y polinomios globales. | **Fenómeno de Runge:** $f(t) = \frac{1}{1 + 25t^2}$ con 14 nodos. Lagrange y Newton explotan en bordes ($E_r \approx 2499\%$), Splines mantienen $E_r \approx 0.43\%$. |
 
 ---
 

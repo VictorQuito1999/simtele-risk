@@ -42,10 +42,40 @@ def test_raices_deterioro():
     assert rs['converged'] and abs(rs['root'] - xr) < 1e-6, "Secante falló"
     assert rn['iters'] < rb['iters'], "Newton debe converger en menos iteraciones que Bisección"
 
+def test_integracion_y_edo():
+    # Integral exacta de x^2 en [0, 3] = 9.0
+    f = lambda x: x**2
+    assert abs(trapecio_compuesto(f, 0.0, 3.0, 100) - 9.0) < 1e-2
+    assert abs(simpson_13_compuesto(f, 0.0, 3.0, 20) - 9.0) < 1e-12
+    rb = romberg(f, 0.0, 3.0, tol=1e-10)
+    assert rb['converged'] and abs(rb['integral'] - 9.0) < 1e-10
+
+    # Módulo 1 y Módulo 3 contra referencia analítica
+    import modulo1, modulo3
+    _, an1, out1 = modulo1.ejecutar('NORMAL')
+    assert abs(out1['RK4']['d_final'] - an1['d_total']) / an1['d_total'] < 1e-4
+    assert out1['Raíces']['Bisección']['converged']
+    assert out1['Raíces']['Newton']['converged']
+    assert out1['Raíces']['Secante']['converged']
+
+    _, x_ex3, out3 = modulo3.ejecutar('NORMAL')
+    assert out3['RK4']['err_rel'] < 1e-5
+    assert out3['RK4']['err_rel'] < out3['RK2 (Heun)']['err_rel']
+
+def test_interpolacion_runge():
+    import modulo4
+    _, _, out4_norm = modulo4.ejecutar('NORMAL')
+    assert out4_norm['Splines Cúbicos']['err_rel'] < 1e-3
+    _, _, out4_runge = modulo4.ejecutar('MAL_CONDICIONADO')
+    assert out4_runge['Lagrange']['err_rel'] > 1.0, "Lagrange debe explotar en Runge"
+    assert out4_runge['Splines Cúbicos']['err_rel'] < 0.01, "Splines deben mantenerse estables en Runge"
+
 if __name__ == '__main__':
     test_normal()
     test_manual()
     test_hilbert_cota()
     test_radios_espectrales()
     test_raices_deterioro()
-    print("Todos los tests de metodos.py (sistemas lineales + raíces) pasaron exitosamente.")
+    test_integracion_y_edo()
+    test_interpolacion_runge()
+    print("Todos los tests de metodos.py (lineales, raíces, integración, EDO, interpolación) pasaron exitosamente.")

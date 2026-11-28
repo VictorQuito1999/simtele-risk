@@ -18,8 +18,8 @@
     </div>
     <div style="text-align: right; background: rgba(0,0,0,0.2); padding: 1rem 1.25rem; border-radius: 8px;">
       <div style="font-size: 0.8rem; opacity: 0.8;">ESTADO DEL PROYECTO</div>
-      <div style="font-size: 1.25rem; font-weight: 700;">Semana 2: Activa</div>
-      <div style="font-size: 0.85rem; color: #86efac;">4 Casos · Persistencia SQLite</div>
+      <div style="font-size: 1.25rem; font-weight: 700;">Semana 3: Final</div>
+      <div style="font-size: 0.85rem; color: #86efac;">4 Casos · Turso Cloud / SQLite</div>
     </div>
   </div>
 </div>
@@ -34,7 +34,7 @@
   <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <span class="badge badge-blue">Caso 1 · Activo S2</span>
+        <span class="badge badge-blue">Caso 1 · Validado S3</span>
         <span style="font-size: 0.8rem; color: var(--text-muted);">EDO + Raíces + Integración</span>
       </div>
       <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.5rem;">
@@ -58,7 +58,7 @@
   <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-color: #38bdf8; box-shadow: var(--shadow-lg);">
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <span class="badge badge-normal">Caso 2 · Activo S1/S2</span>
+        <span class="badge badge-normal">Caso 2 · Validado S3</span>
         <span style="font-size: 0.8rem; color: var(--text-muted);">Sistemas Lineales + Raíces</span>
       </div>
       <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.5rem;">
@@ -82,7 +82,7 @@
   <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <span class="badge badge-normal">Caso 3 · Activo S2</span>
+        <span class="badge badge-normal">Caso 3 · Validado S3</span>
         <span style="font-size: 0.8rem; color: var(--text-muted);">EDO 2° Orden + Integración</span>
       </div>
       <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.5rem;">
@@ -106,7 +106,7 @@
   <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <span class="badge badge-normal">Caso 4 · Activo S2</span>
+        <span class="badge badge-normal">Caso 4 · Validado S3</span>
         <span style="font-size: 0.8rem; color: var(--text-muted);">Interpolación Polinómica & Splines</span>
       </div>
       <h3 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 0.5rem;">
@@ -146,9 +146,20 @@
       <p style="color: var(--text-muted); margin-top: 4px;">Establece los umbrales de descarte por alambres rotos, pérdida de sección metálica y fatiga cíclica en cables portadores-tractores.</p>
     </div>
     <div style="background: var(--bg); padding: 1rem; border-radius: 6px;">
-      <b style="color: var(--primary);">Persistencia Relacional SQLite:</b>
+      <b style="color: var(--primary);">Persistencia Relacional Turso / SQLite:</b>
       <p style="color: var(--text-muted); margin-top: 4px;">Cumple con el almacenamiento estructurado en 6 entidades y la prueba obligatoria de recuperación y relanzamiento sin variables en memoria.</p>
     </div>
   </div>
+</div>
+
+<!-- Conclusión Integradora del Sistema (Semana 3) -->
+<div class="card" style="margin-top: 1.5rem; border-left: 4px solid var(--primary);">
+  <div class="card-header">
+    <h3 class="card-title">Conclusión Integradora del Sistema (Semana 3)</h3>
+    <span class="badge badge-normal">Validación Integral 4 × 3</span>
+  </div>
+  <p style="font-size: 0.92rem; color: var(--text); line-height: 1.7;">
+    La validación conjunta de los <b>cuatro casos de estudio</b> bajo sus escenarios <b>NORMAL</b>, <b>ESTRÉS</b> y <b>MAL CONDICIONADO</b> demuestra que la confiabilidad de un sistema de simulación de transporte por cable depende simultáneamente de dos planos inseparables: (1) la <b>estabilidad, orden de convergencia y condicionamiento</b> del método numérico (distinguiendo entre divergencia algorítmica como Jacobi con $\rho(T_J)&gt;1$ o Runge en Lagrange/Newton, y amplificación intrínseca de errores por $\kappa(A)$ elevado), y (2) la <b>traducción operativa a márgenes físicos de seguridad</b> (vía libre en estación, vida útil remanente del cable, gálibo ante resonancia e integridad de telemetría). La persistencia relacional en 6 tablas normalizadas sobre Turso/SQLite garantiza la reproducibilidad verificable de cada experimento.
+  </p>
 </div>
 {% endblock %}
